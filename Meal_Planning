@@ -1,5 +1,5 @@
 # Import 
-import csv, json, sys, re
+import csv, json, sys, re, os
 from typing import List, Dict, Any
 
 #Classes
@@ -17,26 +17,26 @@ class Item():
         # Registry uses its data for saving/loading.
         # calculator and DayLog call methods like to_registry_dict.
     
-    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str):
+    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, brand: str):
         """
-        Initialize common attricutes for an item.
+        Initialize all attributes for an item. Autosaves the item to the registry upon initialization.
 
-        Ex: ('test1', 'test', 'example', 0.0, [test, delete_later], ''),
-        ('apple', 'food', 'non-ingredient', 95.0, [location_fridge, snack], 'Walmart'), etc.
+        Input: ('apple', 'food', 'non-ingredient', 95.0, 'Walmart'), etc.
         """
 
         self.name = CheckType.is_string(item_name)
         self.item_type = CheckType.is_string(item_type)
         self.sub_type = CheckType.is_string(sub_type)
         self.kcal = CheckType.is_float(kcal)
-        self.id = self.id_gen()
-        self.tags = CheckType.is_list(tags)
         self.brand = CheckType.is_string(brand)
+        self.id = self.id_gen()
+
+        self.tags = []
         self.time = 0.0
         self.data = {}
         self.makeup = []
 
-        ItemRegistry.register_item(self)
+        ItemRegistry.register_item(self.to_registry_dict())
 
     def id_gen(self):
         """
@@ -45,8 +45,11 @@ class Item():
         Ex: 'f001', 'r002', 'w003', 's004', etc.
         """
 
-        count = ItemRegistry.count_type(self.item_type)
-        return f"{self.item_type}{count+1:03d}"
+        count = SummaryIndex.count_type(self.item_type)
+        return f"{self.item_type[0]}{count+1:03d}"
+
+    def add_tags(self):
+        pass
     
     def to_summary_dict(self) -> Dict[str, Any]:
         """
@@ -60,7 +63,18 @@ class Item():
         Return a full dict of the item for serialization to registry.
         """
         
-        return self.__dict__ # Because some things will have to JSON coded see if __dict__ neds to be a method.
+        return {
+            'id': self.id,
+            'name': self.name,
+            'item_type': self.item_type,
+            'sub_type': self.sub_type,
+            'brand': self.brand,
+            'kcal': self.kcal,
+            'time': self.time,
+            'data': self.data,
+            'tags': ','.join(self.tags) if isinstance(self.tags, list) else self.tags,
+            'makeup': self.makeup
+        }
 
     def update_field(self, field_name, new_value):
         """
@@ -324,7 +338,7 @@ class NutritionalCalculator():
     def calculate_recipe_totals(recipe: Recipe):
         pass
     
-    def calculate_daylog_totals(log: DayLog):
+    def calculate_daylog_totals():
         pass
 
 class Tutorial(): # Consider using a JSON docstring parser to auto-fill this
@@ -367,8 +381,22 @@ class ItemRegistry():
     # Interactions:
         # Works with SummaryIndex, DayLog, ITem, and I/O.
 
-    def register_item():
-        pass
+    headers = ['id', 'name', 'item_type', 'sub_type', 'brand', 'kcal',
+                  'time', 'data', 'makeup', 'tags']
+    registry_file = "item_registry.csv"
+
+    @classmethod
+    def register_item(cls, row):
+        file_exists = os.path.isfile(cls.registry_file)
+
+        with open(cls.registry_file, 'a', newline='', encoding='utf-8') as f_out:
+            writer = csv.DictWriter(f_out, fieldnames=cls.headers)
+
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+        
+        SummaryIndex.save_index()
     
     def load_registry():
         pass
@@ -411,15 +439,48 @@ class SummaryIndex():
     
     # Interactions:
         # Called by Registry and AdvancedSearch
-
-    def count_type(item_type):
-        pass
-
-    def load_index():
-        pass
     
-    def save_index():
-        pass
+    headers = ['id', 'name']
+    index_file = 'summary_index.csv'
+
+    @classmethod
+    def count_type(cls, item_type):
+        prefix = item_type[0]
+        index = cls.load_index()
+        return sum(1 for item in index if item['item_id'].startswith(prefix))
+
+    @classmethod
+    def load_index(cls):
+        """
+        Return a list (or dictionary) of all items currently tracked in the summary index, likely read from a CSV file (which stores rows where each entry is a JSON string).
+        """
+        
+        index = []
+        
+        with open (cls.index_file, 'r', newline='', encoding='utf-8') as f_in:
+            reader = csv.DictReader(f_in)
+            for row in reader:
+                index.append(row)
+
+        return index
+    
+    @classmethod
+    def save_index(cls):
+        summary_data = []
+
+        with open(ItemRegistry.registry_file, 'r', newline='', encoding='utf-8') as f_in:
+            reader = csv.DictReader(f_in)
+
+            for row in reader:
+                summary_data.append({
+                    'id': row.get('id', ''),
+                    'name': row.get('name', '')
+                })
+
+        with open (cls.index_file, 'w', newline='', encoding='utf-8') as f_out:
+            writer = csv.DictWriter(f_out, fieldnames=cls.headers)
+            writer.writeheader()
+            writer.writerows(summary_data)
     
     def update_entry(item):
         pass
@@ -472,7 +533,7 @@ class DayLog():
 
 # Working Code
 def main():
-    pass
+    Test = Item("testing", "testing", "1", 2.0, "3")
 
 if __name__ == '__main__':
     main()
