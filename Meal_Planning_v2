@@ -1,0 +1,535 @@
+"""
+Information:
+Use a .to_...() method to help save to a document
+Use a .from_...() method to recreate an item
+Use a .get_...() method to return a string
+Use json.dumps() to save lists to csv
+Use json.loads() to decode lists back
+
+**kwargs allows the method to be flexible
+
+Utiltiy:
+- .to_dict()
+- .from_csv()
+- .from_dict()
+- .to_summary_dict()
+- .get_summary_row()
+- .matches_filters(**kwargs)
+
+Classes: 
+- AdvancedSearch
+    # Find, Sort, Filter Class
+        #Time, high in specific nutrients, flexible, in a recipe, all food items, ingredient or not, high ingreident, type, equiptment, stretch vs exercise, flexible
+    
+- NutritionCalculator
+    # Uses the ids provided to calcute the nutrition and kcals.
+
+- ItemRegistry
+    * Document of all children items (Full metadata)  ^ type (ingredient or not)
+    # Real-time updates
+
+- SummaryIndex
+    * Document of a summary of all children items (Specifically for finding ID's for better searching in the full metadata document) ^ID, name, type, kcal
+        # Regenerate by parsing the master document
+
+- Item (Parent)
+    # sends items to registry and summary
+
+    - Food (Child)
+
+    - Recipe (Child)
+        # Compute nutrition data from food IDs
+        # Add code to help scale ingridents to recipes
+
+    - Workout (Child)
+    
+    - Supplement (Child)
+
+- DayLog
+    * Document of each day as it is updated
+
+    * Document of a planned day
+        # Average kcal burned on previous days of the week to help with planning
+
+    # Supplements are automatically added, but can be removed if needed
+    # Can make a 'usual' items that can be brought in at once (pineapple juice, fiber one, etc.).
+"""
+
+# Import 
+import csv, json, sys, re
+from typing import List, Dict, Any
+
+#Classes
+class Item():
+    """
+    Abstract base class for all items in the nutritional planner.
+    Contains shared attributes like name, kcal, tags, ect., and mehtods for serialization
+    """
+    # Why:
+        # Central abstraction fro Food, Recipe, etc.
+        # Ensures consistent data structure.
+
+    # Interactions:
+        # Subclasses inherit from it.
+        # Registry uses its data for saving/loading.
+        # calculator and DayLog call methods like to_registry_dict.
+    
+    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str):
+        """
+        Initialize common attricutes for an item.
+
+        Ex: ('test1', 'test', 'example', 0.0, [test, delete_later], ''),
+        ('apple', 'food', 'non-ingredient', 95.0, [location_fridge, snack], 'Walmart'), etc.
+        """
+
+        self.name = CheckType.is_string(item_name)
+        self.item_type = CheckType.is_string(item_type)
+        self.sub_type = CheckType.is_string(sub_type)
+        self.kcal = CheckType.is_float(kcal)
+        self.id = self.id_gen()
+        self.tags = CheckType.is_list(tags)
+        self.brand = CheckType.is_string(brand)
+        self.time = 0.0
+        self.data = {}
+        self.makeup = []
+
+        ItemRegistry.register_item(self)
+
+    def id_gen(self):
+        """
+        Generate a unique ID for this item based on its type.
+
+        Ex: 'f001', 'r002', 'w003', 's004', etc.
+        """
+
+        count = ItemRegistry.count_type(self.item_type)
+        return f"{self.item_type}{count+1:03d}"
+    
+    def to_summary_dict(self) -> Dict[str, Any]:
+        """
+        Return a lightweight dict with ID and name for the summary index 
+        """
+
+        return {'id': self.id, 'name': self.name}
+    
+    def to_registry_dict(self):
+        """
+        Return a full dict of the item for serialization to registry.
+        """
+        
+        return self.__dict__ # Because some things will have to JSON coded see if __dict__ neds to be a method.
+
+    def update_field(self, field_name, new_value):
+        """
+        Update an indivdual attribute of the item
+        """
+        pass
+
+    def auto_update_dependents():
+        """
+        Notify the registry to update all items (recipes/daylogs) that reference this item.
+        """
+        pass
+
+    def __str__():
+        pass
+
+    def __repr__():
+        pass
+
+class Food(Item):
+    """
+    A basic food item with full nutritional data.
+    Inherits from Item.
+    """
+
+    # Why:
+        # Direct subclass with minimal change.
+    
+    def __init__(self, item_name: str, sub_type: str, kcal: float, tags: list, brand: str,
+                 serving_size: float, serving_unit: str, servings: float, 
+                 protein: float, carbs: float, total_fat: float, saturated_fat: float, trans_fat: float, 
+                 cholesterol: float, sodium: float, fiber: float,
+                 total_sugars: float, added_sugars: float,
+                 vitamin_d: float, calcium: float, iron: float, potassium: float):    
+        super().__init__(self, item_name, 'food', sub_type, kcal, tags, brand)
+        self.data = {"serving_information": {
+                        "serving_size": CheckType.is_float(serving_size),
+                        "serving_unit": CheckType.is_string(serving_unit),
+                        "servings": CheckType.is_float(servings)},
+                    "nutrition": {
+                        "macros": {
+                            "protein": CheckType.is_float(protein),
+                            "carbs": CheckType.is_float(carbs),
+                            "fats": {
+                                "total_fat": CheckType.is_float(total_fat),
+                                "saturated_fat": CheckType.is_float(saturated_fat),
+                                "trans_fat": CheckType.is_float(trans_fat)}},
+                        "cholesterol": CheckType.is_float(cholesterol),
+                        "sodium": CheckType.is_float(sodium),
+                        "fiber": CheckType.is_float(fiber),
+                        "sugars": {
+                            "total_sugars": CheckType.is_float(total_sugars),
+                            "added_sugars": CheckType.is_float(added_sugars)},
+                        "vitamin_d": CheckType.is_float(vitamin_d),
+                        "calcium": CheckType.is_float(calcium),
+                        "iron": CheckType.is_float(iron),
+                        "potassium": CheckType.is_float(potassium)}}
+    
+    def from_nutrition_label():
+        """parse label into data"""
+        pass
+
+    def edit_macros():
+        pass
+
+class Recipe(Item):
+    """
+    A recipe composed of multiple food items, referenced by their IDs.
+    """
+
+    # Why:
+        # Composed of Food IDs (ingredients)
+        # Needs to auto-update if a food changes.
+
+    # Interactions:
+        # Calls NutritionalCalculator to total up nutrients.
+        # Uses ItemRegistry to resolve Ids to actual Food items.
+
+    def __init__(self):
+        self.data = {"serving_information": {
+                            "serving_size": 0.0,
+                            "serving_unit": "",
+                            "servings": 0.0},
+                        "nutrition": {
+                            "macros": {
+                                "protein": 0.0,
+                                "carbs": 0.0,
+                                "fats": {
+                                    "total_fat": 0.0,
+                                    "saturated_fat": 0.0,
+                                    "trans_fat": 0.0}},
+                            "cholesterol": 0.0,
+                            "sodium": 0.0,
+                            "fiber": 0.0,
+                            "sugars": {
+                                "total_sugars": 0.0,
+                                "added_sugars": 0.0},
+                            "vitamin_d": 0.0,
+                            "calcium": 0.0,
+                            "iron": 0.0,
+                            "potassium": 0.0}}
+    
+    def build_from_ingredients(list_of_food_ids):
+        """
+        Assign ingredient IDs to this recipe's makeup field.
+        """
+        pass
+
+    def calculate_totals():
+        """
+        Calculate the total nutrition of this recipe using NutritionalCalculator.
+        """
+        pass
+
+    def update_ingredient(food_id, new_food_id):
+        """
+        Replace one ingredient with another.
+        """
+        pass
+
+    def update_on_food_change():
+        """
+        Recalculate totals if any ingredient has changed in the registry.
+        """
+        pass
+
+class Workout(Item):
+    """
+    A workout session, which may consist of multiple steps.
+    Steps are referenced by ID if available.
+    """
+
+    # Why:
+        # Complex structre, may invovle substeps.
+        # Needs support for calorie estimation if only summary info is available.
+
+    # Interactions:
+        # Calls NutritionalCalculator for calorie estimates.
+        # Registry might help aggregate step data.
+
+    def __init__(self, item_name, item_type, sub_type, kcal, tags, brand):
+        super().__init__(item_name, item_type, sub_type, kcal, tags, brand)
+    
+    def add_steps(steps_ids):
+        """
+        Add smaller exercise steps to this workout.
+        """
+        pass
+    
+    def estimate_step_kcal():
+        """
+        Distribute known total kcal across steps proportionally.
+        """
+        pass
+    
+    def update_on_step_change():
+        """
+        Recalculate estimates if any step has changed in registry.
+        """
+        pass
+
+class Supplement(Item):
+    """
+    A supplement item (e.g., vitamin) with possible brand and data feilds.
+    """
+
+    def __init__(self, item_name, item_type, sub_type, kcal, tags, brand):
+        super().__init__(item_name, item_type, sub_type, kcal, tags, brand)
+    
+    def parse_label():
+        pass
+
+class CheckType():
+    """
+    Helper class for validating and prompting correct user input types.
+    """
+
+    # Why:
+        # Keeps validation logit out of other classses.
+
+    # Interactions:
+        # Used by any class prompting user input.
+
+    @staticmethod
+    def is_string(value: str) -> str:
+        """Ensures the value is a non-empty string. Prompts until valid."""
+        while True:
+            if isinstance(value, str) and value.strip():
+                return value
+            value = input(f"'{value}' is not a valid non-empty string. Please try again: ")
+
+    @staticmethod
+    def is_float(value) -> float:
+        """Ensures the value is a float. Prompts until valid."""
+        while True:
+            try:
+                return float(value)
+            except ValueError:
+                value = input(f"'{value}' is not a valid number. Please try again: ")
+        
+    @staticmethod
+    def is_list(value) -> list:
+        while not isinstance(value, list):
+            try:
+                return value.split(',')
+            except:
+                value = input(f"'{value}' is not a valid list. Please try again: ")
+        return value            
+
+class AdvancedSearch():
+    """
+    Search and filter functionality for all items in the registry.
+    """
+
+    # Why:
+        # Powerful, felxible searching and sorting across tiem attributes.
+
+    # Interactions:
+        # Accesses ItemRegistry.items directly.
+    
+    def search_by_name(name):
+        pass
+    
+    def search_by_tag(tag):
+        pass
+    
+    def search_by_kcal(min, max):
+        pass
+    
+    def search_by_type(item_type):
+        pass
+    
+    def reverse_search(tag = None, brand = None):
+        """Find items missing data"""
+        pass
+    
+    def sort_results(results, key, reverse = False):
+        pass
+    
+    def filter_items(predicate_fuction):
+        """Allows custom filter logic"""
+        pass
+
+class NutritionalCalculator():
+    """
+    Utility class for calculating and aggregating nutritional data.
+    """
+
+    # Why:
+        # Handles all nutrient math in one place.
+
+    # Interactions:
+        # Called by Recipe, DayLog, possibly Workout.
+    
+    def sum_nutrition(items: list[Item]):
+        pass
+    
+    def adjust_amount(item: Item, factor: float):
+        pass
+    
+    def calculate_recipe_totals(recipe: Recipe):
+        pass
+    
+    def calculate_daylog_totals(log: DayLog):
+        pass
+
+class Tutorial(): # Consider using a JSON docstring parser to auto-fill this
+    """
+    Provides structured guidance about app classes, methods, and tags.
+    """
+
+    # Why:
+        # In-app help / documentation system.
+    
+    # Interactions:
+        # Reads method docstrings or metadata about classes
+
+    def list_classes():
+        pass
+    
+    def list_methods(class_name):
+        pass
+    
+    def describe_method(class_name, method_name):
+        pass
+    
+    def list_tags():
+        #List of possible tags: [
+        # 'ingredient', 'breakfast', 'lunch', 'dinner', 'snack', 'drink', 'cooked', 'baked',
+        # 'location_bread', 'location_fridge', 'location_freezer', 'location_baking', 'location_snack', 'location_lazy_susan', 'location_counter'
+        # ]
+        pass
+
+class ItemRegistry():
+    """
+    Stores and manages all registered items.
+    Automatically updates index and dependents when items change.
+    """
+
+    # Why:
+        # Main source of truth. Holds all items.
+        # Automatically updates dependents and syncs index.
+
+    # Interactions:
+        # Works with SummaryIndex, DayLog, ITem, and I/O.
+
+    def register_item():
+        pass
+    
+    def load_registry():
+        pass
+    
+    def save_registry():
+        pass
+    
+    def add_item(item):
+        pass
+    
+    def delete_item(item_id):
+        pass
+    
+    def edit_item(item_id, new_values):
+        pass
+    
+    def get_item(item_id):
+        pass
+    
+    def update_dependents(item_id):
+        pass
+    
+    def sync_index():
+        """Calls SummaryIndex to update it."""
+        pass
+    
+    def get_all_by_type(item_type):
+        pass
+    
+    def get_items_using(item_id):
+        """Returns recipes/workouts/daylogs"""
+        pass
+
+class SummaryIndex():
+    """
+    Provides a lightweight reference index of all item Ids and names.
+    """
+    # Why:
+        # Allows quick ID <-> name lookups without reading entire registry.
+    
+    # Interactions:
+        # Called by Registry and AdvancedSearch
+
+    def count_type(item_type):
+        pass
+
+    def load_index():
+        pass
+    
+    def save_index():
+        pass
+    
+    def update_entry(item):
+        pass
+    
+    def delete_entry(item_id):
+        pass
+    
+    def search_name(query):
+        pass
+
+class DayLog():
+    """
+    Represents a daily plan or actual log of foods, workouts, and supplements.
+    """
+
+    # Why:
+        # Core to tracking and planning meals/workouts.
+
+    # Interactions:
+        # Calls Registry to resolve item IDs.
+        # Calls Calculator to total nutrition.
+
+    def __init__(self, date, planned = False):
+        pass
+    
+    def add_item(item_id, category = 'planned'):
+        pass
+    
+    def remove_item(item_id, category = 'planned'):
+        pass
+    
+    def get_total_kcal(category = 'actual'):
+        pass
+    
+    def get_macros(category = 'planned'):
+        pass
+    
+    def adjust_plan():
+        pass
+    
+    def sync_with_registry():
+        """Auto-update based on item changes."""
+        pass
+    
+    def save_log():
+        pass
+    
+    def load_log():
+        pass
+
+# Working Code
+def main():
+    pass
+
+if __name__ == '__main__':
+    main()
