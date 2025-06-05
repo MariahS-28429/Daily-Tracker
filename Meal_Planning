@@ -24,11 +24,11 @@ class Item():
         Input: ('apple', 'food', 'non-ingredient', 95.0, 'Walmart'), etc.
         """
 
-        self.name = CheckType.is_string(item_name)
-        self.item_type = CheckType.is_string(item_type)
-        self.sub_type = CheckType.is_string(sub_type)
+        self.name = CheckType.is_string(item_name).lower()
+        self.item_type = CheckType.is_string(item_type).lower()
+        self.sub_type = CheckType.is_string(sub_type).lower()
         self.kcal = CheckType.is_float(kcal)
-        self.brand = CheckType.is_string(brand)
+        self.brand = CheckType.is_string(brand).lower()
         self.id = self.id_gen()
 
         self.tags = []
@@ -40,13 +40,30 @@ class Item():
 
     def id_gen(self):
         """
-        Generate a unique ID for this item based on its type.
+        Generate the lowest available unique ID for this item based on its type prefix.
 
         Ex: 'f001', 'r002', 'w003', 's004', etc.
         """
 
-        count = SummaryIndex.count_type(self.item_type)
-        return f"{self.item_type[0]}{count+1:03d}"
+        prefix = self.item_type[0]
+        summary = SummaryIndex.load_index()
+        
+        used_numbers = []
+        for item in summary:
+            if item['id'].startswith(prefix):
+                num_part = item['id'][1:]
+                if num_part.isdigit():
+                    used_numbers.append(int(num_part))
+        
+        used_numbers.sort()
+        next_num = 1
+        for num in used_numbers:
+            if num == next_num:
+                next_num += 1
+            else:
+                break
+        
+        return f"{prefix}{next_num:03d}"
 
     def add_tags(self):
         pass
@@ -72,7 +89,7 @@ class Item():
             'kcal': self.kcal,
             'time': self.time,
             'data': self.data,
-            'tags': ','.join(self.tags) if isinstance(self.tags, list) else self.tags,
+            'tags': self.tags,
             'makeup': self.makeup
         }
 
@@ -80,6 +97,10 @@ class Item():
         """
         Update an indivdual attribute of the item
         """
+        pass
+
+    @classmethod
+    def from_dict(self):
         pass
 
     def auto_update_dependents():
@@ -201,6 +222,9 @@ class Recipe(Item):
         """
         pass
 
+    def recalculate():
+        pass
+
 class Workout(Item):
     """
     A workout session, which may consist of multiple steps.
@@ -234,6 +258,9 @@ class Workout(Item):
         """
         Recalculate estimates if any step has changed in registry.
         """
+        pass
+    
+    def recalculate():
         pass
 
 class Supplement(Item):
@@ -387,48 +414,280 @@ class ItemRegistry():
 
     @classmethod
     def register_item(cls, row):
-        file_exists = os.path.isfile(cls.registry_file)
+        registry = cls.load_registry()
 
-        with open(cls.registry_file, 'a', newline='', encoding='utf-8') as f_out:
+        registry.append(row)
+
+        cls.save_registry(registry)
+    
+    @classmethod
+    def load_registry(cls) -> List[dict]:
+        """
+        Returns a list of all items and their attributes in the registry with each item row being a dictionary 
+        with python objects for certian attributes.
+
+        Output: [{'id': 't001', 'name': 'testing', 'item_type': 'testing', 'sub_type': '1', 'brand': '3', 'kcal': 2.0, 'time': 0.0, 'data': {}, 'makeup': [], 'tags': []}]
+        """
+
+        # Easily called to gain all information and parse through everything for any method that needs it.
+
+        registry = []
+
+        with open(cls.registry_file, 'r', newline='', encoding='utf-8') as f_in:
+            reader = csv.DictReader(f_in)
+            for row in reader:
+                cleaned = {}
+
+                for key, value in row.items():
+                    value = value.strip()
+
+                    # takes the list and dictionary attributes and codes them back into python objects
+                    if key in ['data', 'makeup', 'tags']:
+                        try:
+                            cleaned[key] = json.loads(value) if value else {} if key == 'data' else []
+                        except json.JSONDecodeError:
+                            cleaned[key] = {} if key == 'data' else []
+
+                    # takes the float attributes and codes them back into python objects
+                    elif key in ['kcal', 'time']:
+                        try:
+                            cleaned[key] = float(value)
+                        except ValueError:
+                            cleaned[key] = 0.0
+
+                    # everything else is just added back on, as is.
+                    else:
+                        cleaned[key] = value
+
+                registry.append(cleaned)
+
+        return registry
+    
+    @classmethod
+    def save_registry(cls, registry: List[dict]):
+        """
+        Updates / saves the registry with the new and updated registry given to it. 
+        Codes items with json so they can be converted back to python objects.
+
+        Input: [{'id': 't001', 'name': 'testing', 'item_type': 'testing', 'sub_type': '1', 'brand': '3', 'kcal': 2.0, 'time': 0.0, 'data': {}, 'makeup': [], 'tags': []}, 
+        {'id': 't002', 'name': 'testing', 'item_type': 'testing', 'sub_type': '1', 'brand': '3', 'kcal': 2.0, 'time': 0.0, 'data': {}, 'makeup': [], 'tags': []}]
+        """
+
+        with open(cls.registry_file, 'w', newline='', encoding='utf-8') as f_out:
+            
+            # if the registry is empty, don't save it.
+            if not registry:
+                return
+            
             writer = csv.DictWriter(f_out, fieldnames=cls.headers)
+            writer.writeheader()
 
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(row)
+            # codes some attributes to json for later conversions
+            for item in registry:
+                row = item.copy()
+                for field in ['data', 'makeup', 'tags']:
+                    row[field] = json.dumps(row.get(field, {} if field == 'data' else []))
+                writer.writerow(row)
         
         SummaryIndex.save_index()
     
-    def load_registry():
+    
         pass
     
-    def save_registry():
-        pass
+    @classmethod
+    def resolve_id_by_name(cls, name: str) -> str | None:
+        """
+        Find the item ID based on a (possibly non-unique) item name.
+        Returns the selected item ID, or None if not found/aborted.
+        """
+
+        matches = SummaryIndex.search_name(name)
+
+        if not matches:
+            print(f"No items found with name matching '{name}'.")
+            return None
+
+        if len(matches) == 1:
+            return matches[0]['id']
+
+        print(f"\nMultiple items found matching '{name}':")
+        for i, item in enumerate(matches, 1):
+            print(f"{i}. [{item['id']}] {item['brand']} {item['name']}")
+
+        try:
+            choice = int(input("Enter the number of the item: "))
+            if 1 <= choice <= len(matches):
+                return matches[choice - 1]['id']
+            else:
+                print("Invalid choice.")
+        except ValueError:
+            print("Invalid input.")
+
+        return None
     
-    def add_item(item):
-        pass
+    @classmethod
+    def delete_item(cls, item_name: str) -> bool:
+        """
+        Delete the item with the given ID from the registry.
+
+        Returns True if an item was deleted, False if not found.
+
+        Input: 't003', 'q200'
+        Output: True, False
+        """
+
+        # checks the summary index for any matches to the item name given
+        id = cls.resolve_id_by_name(item_name)
+        if not id:
+            return False
+        
+        registry = cls.load_registry()
+        original_len = len(registry)
+
+        # Finds the item row based on id
+        item = cls.get_item(id)
+        if not item:
+            return False
+        
+        # Validates deletion with the user
+        print(f"\nYou are about to delete the following item:")
+        for key, value in item.items():
+            print(f"  {key}: {value}")
+        confirm = input("Are you sure you want to delete this item? (y/n): ").strip().lower()
+
+        if confirm not in ('y', 'yes'):
+            print("Deletion cancelled.")
+            return False
+        
+        # Updates the registry by adding every row but the one with the chosen id
+        updated_registry = [i for i in registry if i['id'] != id]    
+        if len(updated_registry) == original_len:
+            print(f"No item found with ID '{id}'.")
+            return False
+        cls.save_registry(updated_registry)
+  
+    @classmethod
+    def update_field(cls, item_name: str, field_name: str, new_value) -> bool:
+        """
+        Let's a user change fields for items that already exist in the registry file.
+
+        Returns True if a change was made, False if not.
+
+        Input: ('testing', 'name', 'test')
+        Output: True
+        """
+
+        # checks the summary index for any matches to the item name given
+        if field_name not in cls.headers:
+            print(f"'{field_name}' is not a valid field name.")
+            return False
+        
+        # finds the id for the item
+        id = cls.resolve_id_by_name(item_name)
+        if not id:
+            return False
+
+        registry = ItemRegistry.load_registry()
+        found = False
+
+        # iterates over the registry until it finds the item and repalces the field's value.
+        for item in registry:
+            if item['id'] == id:
+                item[field_name] = new_value
+                found = True
+                break
+        
+        if not found:
+            print(f"Item with ID '{id}' not found in registry.")
+            return False
+        
+        cls.save_registry(registry)
+        return True
+
+    @classmethod
+    def get_item(cls, id):
+        registry = cls.load_registry()
+        return next((item for item in registry if item['id'] == id), None)
     
-    def delete_item(item_id):
-        pass
+    @classmethod
+    def instantiate_item(cls, item_dict):
+        item_type = item_dict.get("item_type")
+
+        item_classes = {
+            "food": Food,
+            "recipe": Recipe,
+            "workout": Workout,
+            "supplement": Supplement
+        }
+
+        klass = item_classes.get(item_type.lower())
+        if not klass:
+            raise ValueError(f"Unknown item type: {item_type}")
+
+        return klass.from_dict(item_dict)
     
-    def edit_item(item_id, new_values):
-        pass
-    
-    def get_item(item_id):
-        pass
-    
-    def update_dependents(item_id):
-        pass
-    
-    def sync_index():
-        """Calls SummaryIndex to update it."""
-        pass
-    
-    def get_all_by_type(item_type):
-        pass
-    
-    def get_items_using(item_id):
-        """Returns recipes/workouts/daylogs"""
-        pass
+    @classmethod
+    def update_dependents(cls, item_id):
+        """
+        Recalculates and updates any items that include this item_id in their makeup.
+        """
+        dependents = cls.get_items_using(item_id)
+        if not dependents:
+            return
+
+        registry = cls.load_registry()
+        updated = False
+
+        for dependent in dependents:
+            # Find the dependent row in registry by id
+            for row in registry:
+                if row['id'] == dependent['id']:
+                    obj = cls.instantiate_item(row)
+                    obj.recalculate()
+                    row.update(obj.to_registry_dict())
+                    updated = True
+                    break
+
+        if updated:
+            cls.save_registry(registry)
+      
+    @classmethod
+    def get_all_by_type(cls, item_type: str) -> List[dict]:
+        """
+        Purpose:
+            Retrieve all items of a specific type, like all foods, all recipes, all workouts, or all supplements.
+            Useful if you want to list or filter items by type for display, editing, or calculations.
+
+        Why you need it:
+            Imagine you want to show the user all “recipes” in the app or all “workouts” in a given view.
+            It helps isolate subsets of items quickly without loading or filtering everything manually.
+            Also useful in logic that applies differently depending on item type.
+        """
+        
+        registry = cls.load_registry()
+        item_type = item_type.lower()
+
+        return [item for item in registry if item.get('item_type', '') == item_type]
+ 
+    @classmethod
+    def get_items_using(cls, item_id: str) -> List[dict]:
+        """
+        Returns a list of all items that include the given item_id in their makeup.
+
+        Input: item_id like 'f001', 'r002', etc.
+        Output: List of item dicts that reference this item in their makeup.
+        """
+
+        registry = cls.load_registry()
+        items_using = []
+
+        for item in registry:
+            makeup = item.get('makeup', [])
+            # Check if makeup is a list and if any part has matching 'id'
+            if isinstance(makeup, list) and any(part.get('id') == item_id for part in makeup):
+                items_using.append(item)
+
+        return items_using
 
 class SummaryIndex():
     """
@@ -440,21 +699,16 @@ class SummaryIndex():
     # Interactions:
         # Called by Registry and AdvancedSearch
     
-    headers = ['id', 'name']
+    headers = ['id', 'name', 'brand']
     index_file = 'summary_index.csv'
-
-    @classmethod
-    def count_type(cls, item_type):
-        prefix = item_type[0]
-        index = cls.load_index()
-        return sum(1 for item in index if item['item_id'].startswith(prefix))
 
     @classmethod
     def load_index(cls):
         """
         Return a list (or dictionary) of all items currently tracked in the summary index, likely read from a CSV file (which stores rows where each entry is a JSON string).
         """
-        
+        cls.save_index()
+
         index = []
         
         with open (cls.index_file, 'r', newline='', encoding='utf-8') as f_in:
@@ -468,14 +722,14 @@ class SummaryIndex():
     def save_index(cls):
         summary_data = []
 
-        with open(ItemRegistry.registry_file, 'r', newline='', encoding='utf-8') as f_in:
-            reader = csv.DictReader(f_in)
+        registry = ItemRegistry.load_registry()
 
-            for row in reader:
-                summary_data.append({
-                    'id': row.get('id', ''),
-                    'name': row.get('name', '')
-                })
+        for row in registry:
+            summary_data.append({
+                'id': row.get('id', ''),
+                'name': row.get('name', ''),
+                'brand': row.get('brand', '')
+            })
 
         with open (cls.index_file, 'w', newline='', encoding='utf-8') as f_out:
             writer = csv.DictWriter(f_out, fieldnames=cls.headers)
@@ -488,8 +742,11 @@ class SummaryIndex():
     def delete_entry(item_id):
         pass
     
-    def search_name(query):
-        pass
+    @classmethod
+    def search_name(cls, query):
+       query.lower().strip()
+       summary = cls.load_index()
+       return [item for item in summary if query in item['name'].lower()]
 
 class DayLog():
     """
@@ -533,7 +790,9 @@ class DayLog():
 
 # Working Code
 def main():
-    Test = Item("testing", "testing", "1", 2.0, "3")
+    # Test = Item("testing", "testing", "1", 2.0, "3")
+    # ItemRegistry.delete_item('testing')
+    ItemRegistry.update_field('testing', 'name', 'test')
 
 if __name__ == '__main__':
     main()
