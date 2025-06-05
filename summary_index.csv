@@ -1,7 +1,6 @@
-id,name
-t001,testing
-t001,testing
-t001,testing
-t001,testing
-t001,testing
-t001,testing
+id,name,brand
+t002,test,3
+t003,testing,3
+t005,testing,3
+t001,testing,3
+t004,testing,3
