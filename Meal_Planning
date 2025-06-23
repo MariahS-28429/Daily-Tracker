@@ -4,6 +4,9 @@ A way to see a list of all possible tags (and subclasses) [aka a list of all the
 Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict()
 See if it's better for ItemRegistry.update_field() to called Item.from_dict() or not
 Update ItemRegistry.update_field() to use Item.auto_update_dependents() when the field_name is id [change the item's id in other item's makeup]
+Update ItemRegistry to use Item.from_dict() to send to the child classes from_dict()s [ItemRegistry.instantiate_item()]
+Update all ItemRegistry stuff to recreate an Item from the registry. This will make the code a lot easier to understand and would also consolidate a lot (also go through and make ItemRegistry call things like Item.add_tag())
+Make a method in ItemRegistry that goes through and changes the item's row in the registry to match the new row
 """
 
 
@@ -173,20 +176,55 @@ class Item():
             ItemRegistry.update_dependents(self.id)
     
     @classmethod
-    def from_dict(self):
-        pass
+    def from_dict(cls, data: dict):
+        item_type = data.get("item_type")
 
-    def __str__():
-        pass
+        item_classes = {
+            "food": Food,
+            "recipe": Recipe,
+            "workout": Workout,
+            "supplement": Supplement
+        }
 
-    def __repr__():
-        pass
+        klass = item_classes.get(item_type.lower())
+        if not klass:
+            raise ValueError(f"Unknown item type: {item_type}")
 
-    def delete_tags():
-        pass
+        return klass.from_dict(data)
 
-    def add_tags(self):
-        pass
+    def __str__(self):
+        return (f"{self.name.title()} [{self.item_type}/{self.sub_type}] - "
+            f"{self.kcal} kcal - Brand: {self.brand.title()}")
+
+    def __repr__(self):
+        return (f"Item(name={self.name!r}, item_type={self.item_type!r}, "
+            f"sub_type={self.sub_type!r}, kcal={self.kcal!r}, brand={self.brand!r})")
+
+    def delete_tag(self, tag):
+        registry = ItemRegistry.load_registry()
+
+        for row in registry:
+            if row['id'] == self.id:
+                if tag in row["tags"]:
+                    row["tags"].remove(tag)
+                    ItemRegistry.save_registry(registry)
+                break
+        
+        if tag in self.tags:
+            self.tags.remove(tag)
+
+    def add_tag(self, tag):
+        registry = ItemRegistry.load_registry()
+
+        for row in registry:
+            if row['id'] == self.id:
+                if not tag in row['tags']:
+                    row["tags"].append(tag)
+                    ItemRegistry.save_registry(registry)
+                break
+        
+        if not tag in self.tags:
+            self.tags.append(tag)
 
 class Food(Item):
     """
