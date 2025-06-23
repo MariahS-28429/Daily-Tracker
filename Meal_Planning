@@ -4,7 +4,7 @@ A way to see a list of all possible tags (and subclasses) [aka a list of all the
 Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict()
 See if it's better for ItemRegistry.update_field() to called Item.from_dict() or not
 Update ItemRegistry.update_field() to use Item.auto_update_dependents() when the field_name is id [change the item's id in other item's makeup]
-Update ItemRegistry to use Item.from_dict() to send to the child classes from_dict()s [ItemRegistry.instantiate_item()]
+Update things to use ItemRegistry.instantiate_item() more
 Update all ItemRegistry stuff to recreate an Item from the registry. This will make the code a lot easier to understand and would also consolidate a lot (also go through and make ItemRegistry call things like Item.add_tag())
 Make a method in ItemRegistry that goes through and changes the item's row in the registry to match the new row
 """
@@ -18,16 +18,15 @@ from typing import List, Dict, Any
 class Item():
     """
     Abstract base class for all items in the nutritional planner.
-    Contains shared attributes like name, kcal, tags, ect., and mehtods for serialization
-    """
-    # Why:
-        # Central abstraction fro Food, Recipe, etc.
-        # Ensures consistent data structure.
 
-    # Interactions:
-        # Subclasses inherit from it.
-        # Registry uses its data for saving/loading.
-        # calculator and DayLog call methods like to_registry_dict.
+    Handles shared attributes such as name, kcal, tags, and methods for serialization.
+    Subclasses like Food, Recipe, etc., inherit from this to ensure a consistent structure.
+
+    Used by:
+    - Subclasses (e.g., Food, Recipe, Workout)
+    - Registry (for saving/loading data)
+    - Calculator and DayLog (via methods like to_registry_dict)
+    """
     
     """
     Attributes:
@@ -160,8 +159,7 @@ class Item():
             if dependents:
                 for dependent in dependents:
                     makeup = dependent.get("makeup")
-                    id_index = makeup.index(self.id)
-                    makeup[id_index] = change
+                    makeup = [change if x == self.id else x for x in makeup]
                     # Update the matching row in the registry
                     for row in registry:
                         if row["id"] == dependent["id"]:
@@ -174,23 +172,6 @@ class Item():
         
         else:
             ItemRegistry.update_dependents(self.id)
-    
-    @classmethod
-    def from_dict(cls, data: dict):
-        item_type = data.get("item_type")
-
-        item_classes = {
-            "food": Food,
-            "recipe": Recipe,
-            "workout": Workout,
-            "supplement": Supplement
-        }
-
-        klass = item_classes.get(item_type.lower())
-        if not klass:
-            raise ValueError(f"Unknown item type: {item_type}")
-
-        return klass.from_dict(data)
 
     def __str__(self):
         return (f"{self.name.title()} [{self.item_type}/{self.sub_type}] - "
@@ -201,30 +182,31 @@ class Item():
             f"sub_type={self.sub_type!r}, kcal={self.kcal!r}, brand={self.brand!r})")
 
     def delete_tag(self, tag):
-        registry = ItemRegistry.load_registry()
-
-        for row in registry:
-            if row['id'] == self.id:
-                if tag in row["tags"]:
-                    row["tags"].remove(tag)
-                    ItemRegistry.save_registry(registry)
-                break
-        
         if tag in self.tags:
-            self.tags.remove(tag)
+            self.tags.remove()
+
+            registry = ItemRegistry.load_registry()
+            for row in registry:
+                if row['id'] == self.id:
+                    if tag in row["tags"]:
+                        row["tags"].remove(tag)
+                        ItemRegistry.save_registry(registry)
+                    break
 
     def add_tag(self, tag):
-        registry = ItemRegistry.load_registry()
-
-        for row in registry:
-            if row['id'] == self.id:
-                if not tag in row['tags']:
-                    row["tags"].append(tag)
-                    ItemRegistry.save_registry(registry)
-                break
-        
         if not tag in self.tags:
             self.tags.append(tag)
+
+            registry = ItemRegistry.load_registry()
+            for row in registry:
+                if row['id'] == self.id:
+                    if not tag in row['tags']:
+                        row["tags"].append(tag)
+                        ItemRegistry.save_registry(registry)
+                    break
+
+    def __eq__(self, other):
+        return isinstance(other, Item) and self.to_registry_dict() == other.to_registry_dict()
 
 class Food(Item):
     """
