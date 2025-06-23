@@ -1,3 +1,10 @@
+"""
+Things I'm wanting to add:
+A way to see a list of all possible tags (and subclasses) [aka a list of all the ones that are currently being used]
+Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict().
+"""
+
+
 # Import 
 import csv, json, sys, re, os
 from typing import List, Dict, Any
@@ -17,26 +24,40 @@ class Item():
         # Registry uses its data for saving/loading.
         # calculator and DayLog call methods like to_registry_dict.
     
-    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, brand: str):
+    """
+    Attributes:
+    - name (str): Lowercase name of the item
+    - item_type (str): 'food', 'recipe', etc.
+    - sub_type (str): 'ingredient', 'meal', etc.
+    - kcal (float): Caloric value
+    - brand (str): Brand name in lowercase
+    - id (str): Unique identifier generated
+    - tags (list): List of associated tags
+    - time (float): Optional time-related metric (e.g. cooking time)
+    - data (dict): Extra metadata
+    - makeup (list): Used in recipes to store ingredient composition
+    """
+    
+    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str):
         """
         Initialize all attributes for an item. Autosaves the item to the registry upon initialization.
 
-        Input: ('apple', 'food', 'non-ingredient', 95.0, 'Walmart'), etc.
+        Input: ('apple', 'food', 'non-ingredient', 95.0, ['fruit'], 'Walmart'), etc.
         """
 
+        # Attributes that are brought in. Will always be defined in every child class
         self.name = CheckType.is_string(item_name).lower()
         self.item_type = CheckType.is_string(item_type).lower()
         self.sub_type = CheckType.is_string(sub_type).lower()
         self.kcal = CheckType.is_float(kcal)
         self.brand = CheckType.is_string(brand).lower()
         self.id = self.id_gen()
-
-        self.tags = []
+        self.tags = CheckType.is_list(tags)
+        
+        # Attributes are aren't brought in. Only used in some child classes
         self.time = 0.0
         self.data = {}
         self.makeup = []
-
-        ItemRegistry.register_item(self.to_registry_dict())
 
     def id_gen(self):
         """
@@ -48,6 +69,7 @@ class Item():
         prefix = self.item_type[0]
         summary = SummaryIndex.load_index()
         
+        # generates a list of used id's in the class
         used_numbers = []
         for item in summary:
             if item['id'].startswith(prefix):
@@ -55,6 +77,7 @@ class Item():
                 if num_part.isdigit():
                     used_numbers.append(int(num_part))
         
+        # check ths list of used id's to make sure none are missing. If one is, it will make the gap the new ID, if not it will create a new ID
         used_numbers.sort()
         next_num = 1
         for num in used_numbers:
@@ -64,16 +87,13 @@ class Item():
                 break
         
         return f"{prefix}{next_num:03d}"
-
-    def add_tags(self):
-        pass
     
     def to_summary_dict(self) -> Dict[str, Any]:
         """
         Return a lightweight dict with ID and name for the summary index 
         """
 
-        return {'id': self.id, 'name': self.name}
+        return {'id': self.id, 'name': self.name, 'brand': self.brand}
     
     def to_registry_dict(self):
         """
@@ -115,6 +135,12 @@ class Item():
     def __repr__():
         pass
 
+    def delete_tags():
+        pass
+
+    def add_tags(self):
+        pass
+
 class Food(Item):
     """
     A basic food item with full nutritional data.
@@ -153,6 +179,8 @@ class Food(Item):
                         "calcium": CheckType.is_float(calcium),
                         "iron": CheckType.is_float(iron),
                         "potassium": CheckType.is_float(potassium)}}
+        
+        ItemRegistry.register_item(Item.to_registry_dict(self))
     
     def from_nutrition_label():
         """parse label into data"""
@@ -792,7 +820,22 @@ class DayLog():
 def main():
     # Test = Item("testing", "testing", "1", 2.0, "3")
     # ItemRegistry.delete_item('testing')
-    ItemRegistry.update_field('testing', 'name', 'test')
+    # ItemRegistry.update_field('testing', 'name', 'test')
+    # item = Item("Apple", "food", "non-ingredient", 95.0, [], "Walmart")
+
+    # assert item.name == "apple"
+    # assert item.item_type == "food"
+    # assert item.sub_type == "non-ingredient"
+    # assert item.kcal == 95.0
+    # assert item.brand == "walmart"
+    # assert isinstance(item.id, str)
+    # assert item.tags == []
+    # assert item.time == 0.0
+    # assert isinstance(item.data, dict)
+    # assert isinstance(item.makeup, list)
+    
+    # print("✅ Item __init__ test passed.")
+    pass
 
 if __name__ == '__main__':
     main()
