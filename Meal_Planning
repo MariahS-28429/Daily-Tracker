@@ -1,7 +1,9 @@
 """
 Things I'm wanting to add:
 A way to see a list of all possible tags (and subclasses) [aka a list of all the ones that are currently being used]
-Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict().
+Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict()
+See if it's better for ItemRegistry.update_field() to called Item.from_dict() or not
+Create an Item.update_id() method for when the item_type field is changed in update_field() [either Item or ItemRegistry]
 """
 
 
@@ -115,18 +117,28 @@ class Item():
 
     def update_field(self, field_name, new_value):
         """
-        Update an indivdual attribute of the item
-        """
-        pass
+        Lets the user update a field for an already existing item (if the item has been made in the same code and doesn't only exist in the registry)
 
-    @classmethod
-    def from_dict(self):
-        pass
+        Input: Item.update_field(item, "name", "green apple")
+        Output: True
+        """
+        # checks that the field_name is valid
+        if field_name not in vars(self).keys():
+            print(f"'{field_name}' is not a valid field name.")
+            return False
+        
+        setattr(self, field_name, new_value)
+        ItemRegistry.register_item(self.to_registry_dict())
+        return True        
 
     def auto_update_dependents():
         """
         Notify the registry to update all items (recipes/daylogs) that reference this item.
         """
+        pass
+    
+    @classmethod
+    def from_dict(self):
         pass
 
     def __str__():
@@ -821,9 +833,10 @@ def main():
     # Test = Item("testing", "testing", "1", 2.0, "3")
     # ItemRegistry.delete_item('testing')
     # ItemRegistry.update_field('testing', 'name', 'test')
-    # item = Item("Apple", "food", "non-ingredient", 95.0, [], "Walmart")
-
+    item = Item("Apple", "food", "non-ingredient", 95.0, [], "Walmart")
     # assert item.name == "apple"
+    Item.update_field(item, "item_type", "test")
+    assert item.item_type == "test"
     # assert item.item_type == "food"
     # assert item.sub_type == "non-ingredient"
     # assert item.kcal == 95.0
@@ -833,8 +846,6 @@ def main():
     # assert item.time == 0.0
     # assert isinstance(item.data, dict)
     # assert isinstance(item.makeup, list)
-    
-    # print("✅ Item __init__ test passed.")
     pass
 
 if __name__ == '__main__':
