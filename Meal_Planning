@@ -3,7 +3,7 @@ Things I'm wanting to add:
 A way to see a list of all possible tags (and subclasses) [aka a list of all the ones that are currently being used]
 Update SummaryIndex.save_index() to use Item.from_dict() and Item.to_summary_dict()
 See if it's better for ItemRegistry.update_field() to called Item.from_dict() or not
-Create an Item.update_id() method for when the item_type field is changed in update_field() [either Item or ItemRegistry]
+Update ItemRegistry.update_field() to use Item.auto_update_dependents() when the field_name is id [change the item's id in other item's makeup]
 """
 
 
@@ -127,15 +127,50 @@ class Item():
             print(f"'{field_name}' is not a valid field name.")
             return False
         
+        # updates id if the item_type is changed and updates all dependents to change to the new id
+        if field_name == 'item_type':
+            new_id = self.id_gen()
+            self.auto_update_dependents(new_id)
+            self.id = new_id
+        
+        elif field_name == 'id':
+            self.auto_update_dependents(new_value)
+
         setattr(self, field_name, new_value)
+
+        if field_name == 'data' or field_name == 'kcal':
+            self.auto_update_dependents()
+
         ItemRegistry.register_item(self.to_registry_dict())
         return True        
 
-    def auto_update_dependents():
+    def auto_update_dependents(self, change = None):
         """
         Notify the registry to update all items (recipes/daylogs) that reference this item.
         """
-        pass
+        # changes the item's id in its depenents for future reference
+        if change:
+            dependents = ItemRegistry.get_items_using(self.id)
+            registry = ItemRegistry.load_registry()
+            updated = False
+
+            if dependents:
+                for dependent in dependents:
+                    makeup = dependent.get("makeup")
+                    id_index = makeup.index(self.id)
+                    makeup[id_index] = change
+                    # Update the matching row in the registry
+                    for row in registry:
+                        if row["id"] == dependent["id"]:
+                            row["makeup"] = makeup
+                            updated = True
+                            break
+            
+            if updated:
+                ItemRegistry.save_registry(registry)
+        
+        else:
+            ItemRegistry.update_dependents(self.id)
     
     @classmethod
     def from_dict(self):
