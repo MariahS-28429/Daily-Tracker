@@ -1,15 +1,3 @@
-"""
-Things I'm wanting to add:
-- A way to see a list of all possible tags (and subclasses) [aka a list of all the ones that are currently being used]
-
-- Update SummaryIndex.save_index() to use Item.to_summary_dict()
-
-- Update ItemRegistry.update_field() to use Item.auto_update_dependents() when the field_name is id [change the item's id in other item's makeup]
-- Update things to use ItemRegistry.instantiate_item() more (ex. SummaryIndex.save_index() and pretty much all of ItemRegistry [esp .update_field()])
-- Make a method in ItemRegistry that goes through and changes the item's row in the registry to match the new row
-"""
-
-
 # Import 
 import csv, json, sys, re, os
 from typing import List, Dict, Any
