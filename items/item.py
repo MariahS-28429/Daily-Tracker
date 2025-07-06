@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Dict
 
-from helper import CheckType
+from helper.type import CheckType
 from summary import Index, Registry
 
 class Item():
@@ -52,7 +52,7 @@ class Item():
         self.data = {}
         self.makeup = []
 
-    def id_gen(self):
+    def id_gen(self) -> str:
         """
         Generate the lowest available unique ID for this item based on its type prefix.
 
@@ -84,7 +84,7 @@ class Item():
     
     # --- Serialization ---
 
-    def to_registry_dict(self):
+    def to_registry_dict(self) -> Dict:
         """
         Serialize the item into a dictionary for registry storage.
 
@@ -106,7 +106,7 @@ class Item():
         }
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, data: dict) -> 'Item':
         """
         Basic fallback method to create an Item instance from a dictionary.
 
@@ -138,7 +138,7 @@ class Item():
     
     # --- Field Updates and Dependent Updates ---
     
-    def update_field(self, field_name: str, new_value):
+    def update_field(self, field_name: str, new_value) -> bool:
         """
         Update an attribute of the item and notify dependents if necessary.
 
@@ -174,7 +174,7 @@ class Item():
         Registry.register_item(self.to_registry_dict())
         return True
 
-    def auto_update_dependents(self, change = None):
+    def auto_update_dependents(self, change: str = None) -> bool:
         """
         Notify the Registry to update all items (recipes, daylogs, etc.) that reference this item.
 
@@ -201,13 +201,17 @@ class Item():
             
             if updated:
                 Registry.save_registry(registry)
+                return True
+            
+            return False
         
         else:
             Registry.update_dependents(self.id)
+            return True
 
     # --- Tag Management ---
     
-    def add_tag(self, tag):
+    def add_tag(self, tag) -> bool:
         """
         Add a tag to this item and update the registry if changed.
 
@@ -224,9 +228,12 @@ class Item():
                     if not tag in row['tags']:
                         row["tags"].append(tag)
                         Registry.save_registry(registry)
+                        return True
                     break
+        
+        return False
 
-    def delete_tag(self, tag):
+    def delete_tag(self, tag) -> bool:
         """
         Remove a tag from this item and update the registry if changed.
 
@@ -243,7 +250,10 @@ class Item():
                     if tag in row["tags"]:
                         row["tags"].remove(tag)
                         Registry.save_registry(registry)
+                        return True
                     break
+        
+        return False
     
     def has_tag(self, tag: str) -> bool:
         """
@@ -258,9 +268,26 @@ class Item():
 
         return tag.lower() in self.tags
     
+    # --- Display and Reporting ---
+
+    def summary(self) -> str:
+        """
+        Fallback summary method for base Item class.
+        Child classes should override this for specific formats.
+
+        Returns:
+            str: Basic summary string.
+        """
+
+        return (
+            f"{self.name.title()} ({self.item_type}/{self.sub_type}) | "
+            f"Brand: {self.brand.title()} | "
+            f"{self.kcal} kcal | Tags: {', '.join(self.tags) if self.tags else 'No tags'}"
+        )
+    
     # --- Magic Methods ---
     
-    def __str__(self):
+    def __str__(self) -> str:
         """
         String representation for user-friendly display.
         """
@@ -268,7 +295,7 @@ class Item():
         return (f"{self.name.title()} [{self.item_type}/{self.sub_type}] - "
             f"{self.kcal} kcal - Brand: {self.brand.title()}")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Official string representation useful for debugging.
         """
@@ -276,7 +303,7 @@ class Item():
         return (f"Item(name={self.name!r}, item_type={self.item_type!r}, "
             f"sub_type={self.sub_type!r}, kcal={self.kcal!r}, brand={self.brand!r})")
  
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """
         Equality check based on core attributes.
 
@@ -297,3 +324,6 @@ class Item():
             self.brand == other.brand and
             self.tags == other.tags
         )
+
+if __name__ == "__main__":
+    pass

@@ -159,6 +159,14 @@ class TestItem(unittest.TestCase):
         self.assertTrue(item.has_tag('fresh'))
         self.assertTrue(item.has_tag('FRESH'))  # case-insensitive check
         self.assertFalse(item.has_tag('sour'))
+    
+    def test_summary_fallback(self):
+        item = Item("TestItem", "food", "basic", 100, ["tag1", "tag2"], "GenericBrand")
+        summary = item.summary()
+        self.assertIn("Testitem", summary)
+        self.assertIn("Genericbrand", summary)
+        self.assertIn("100 kcal", summary)
+        self.assertIn("tag1", summary)
 
 if __name__ == '__main__':
     unittest.main()
