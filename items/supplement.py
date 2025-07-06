@@ -1,4 +1,8 @@
-from Item_Class import Item
+from items import Item
+from helper import CheckType
+from summary import Registry
+
+from typing import List
 
 class Supplement(Item):
     """
@@ -40,7 +44,7 @@ class Supplement(Item):
                 "fat": CheckType.is_float(total_fat)
             }
 
-        ItemRegistry.register_item(self.to_registry_dict())
+        Registry.register_item(self.to_registry_dict())
 
     @classmethod
     def from_dict(cls, data: dict):

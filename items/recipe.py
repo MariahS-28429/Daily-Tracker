@@ -1,4 +1,4 @@
-from Item_Class import Item
+from items import Item
 
 class Recipe(Item):
     """

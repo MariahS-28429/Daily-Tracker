@@ -1,36 +1,35 @@
-class CheckType():
+class CheckType:
     """
-    Helper class for validating and prompting correct user input types.
+    Helper class for validating input types.
+    Raises ValueError if validation fails.
     """
-
-    # Why:
-        # Keeps validation logit out of other classses.
-
-    # Interactions:
-        # Used by any class prompting user input.
 
     @staticmethod
     def is_string(value: str) -> str:
-        """Ensures the value is a non-empty string. Prompts until valid."""
-        while True:
-            if isinstance(value, str) and value.strip():
-                return value
-            value = input(f"'{value}' is not a valid non-empty string. Please try again: ")
+        """Ensures the value is a non-empty string."""
+        if isinstance(value, str) and value.strip():
+            return value
+        raise ValueError(f"'{value}' is not a valid non-empty string.")
 
     @staticmethod
     def is_float(value) -> float:
-        """Ensures the value is a float. Prompts until valid."""
-        while True:
-            try:
-                return float(value)
-            except ValueError:
-                value = input(f"'{value}' is not a valid number. Please try again: ")
-        
+        """Ensures the value can be converted to a float."""
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            raise ValueError(f"'{value}' is not a valid number.")
+
     @staticmethod
     def is_list(value) -> list:
-        while not isinstance(value, list):
-            try:
-                return value.split(',')
-            except:
-                value = input(f"'{value}' is not a valid list. Please try again: ")
-        return value            
+        """
+        Ensures the value is a list.
+        If a string is provided, attempts to split by comma.
+        Raises ValueError if invalid.
+        """
+        if isinstance(value, list):
+            return value
+        elif isinstance(value, str):
+            # Split by commas and strip whitespace
+            return [item.strip() for item in value.split(',') if item.strip()]
+        else:
+            raise ValueError(f"'{value}' is not a valid list or string representing a list.")

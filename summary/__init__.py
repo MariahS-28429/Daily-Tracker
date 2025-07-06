@@ -1,2 +1,1 @@
-from index import Index
-from registry import Registry
+from .registry import Registry, Index

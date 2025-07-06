@@ -1,4 +1,10 @@
-from Item_Class import Item
+from items import Item
+from helper import CheckType
+from summary import Registry
+
+def filler():
+    i=0
+    pass
 
 class Food(Item):
     """
@@ -36,7 +42,7 @@ class Food(Item):
                         "iron": CheckType.is_float(iron),
                         "potassium": CheckType.is_float(potassium)}}
         
-        ItemRegistry.register_item(Item.to_registry_dict(self))
+        Registry.register_item(Item.to_registry_dict(self))
 
     def edit_macros(self, macro_type: str, change: float):
         macros = self.data["nutrition"]["macros"]
