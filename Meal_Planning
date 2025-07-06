@@ -3,6 +3,10 @@ import csv, json, sys, re, os
 from typing import List, Dict, Any
 
 #Classes
+def filler():
+    i=0
+    pass
+
 class Item():
     """
     Abstract base class for all items in the nutritional planner.
@@ -201,17 +205,14 @@ class Food(Item):
     A basic food item with full nutritional data.
     Inherits from Item.
     """
-
-    # Why:
-        # Direct subclass with minimal change.
     
     def __init__(self, item_name: str, sub_type: str, kcal: float, tags: list, brand: str,
                  serving_size: float, serving_unit: str, servings: float, 
                  protein: float, carbs: float, total_fat: float, saturated_fat: float, trans_fat: float, 
                  cholesterol: float, sodium: float, fiber: float,
                  total_sugars: float, added_sugars: float,
-                 vitamin_d: float, calcium: float, iron: float, potassium: float):    
-        super().__init__(self, item_name, 'food', sub_type, kcal, tags, brand)
+                 vitamin_d: float, calcium: float, iron: float, potassium: float):  
+        super().__init__(item_name, "food", sub_type, kcal, tags, brand)  
         self.data = {"serving_information": {
                         "serving_size": CheckType.is_float(serving_size),
                         "serving_unit": CheckType.is_string(serving_unit),
@@ -236,13 +237,23 @@ class Food(Item):
                         "potassium": CheckType.is_float(potassium)}}
         
         ItemRegistry.register_item(Item.to_registry_dict(self))
-    
-    def from_nutrition_label():
-        """parse label into data"""
-        pass
 
-    def edit_macros():
-        pass
+    def edit_macros(self, macro_type: str, change: float):
+        macros = self.data["nutrition"]["macros"]
+
+        if macro_type.lower() in ["protein", "carbs"]:
+            macros[macro_type] += CheckType.is_float(change)
+        
+        elif macro_type.lower() in ["total_fat", "saturated_fat", "trans_fat"]:
+            macros["fats"][macro_type] += CheckType.is_float(change)
+        
+        else:
+            raise ValueError(f"Invalid macro type: {macro_type}. Must be one of: "
+                            "'protein', 'carbs', 'total_fat', 'saturated_fat', 'trans_fat'.")
+        
+        filler() #This will be where it recaluclates kcal, if needed
+
+        filler() #ItemRegistry.update_item(self.item_name, Item.to_registry_dict(self)) ###I need to make update_item method
 
 class Recipe(Item):
     """
@@ -887,6 +898,26 @@ class ItemRegistry():
                 items_using.append(item)
 
         return items_using
+    
+    @classmethod
+    def call_tags(cls) -> set:
+        registry = cls.load_registry()
+        tags = set()
+
+        for item in registry:
+            tags.update(item["tags"])
+        
+        return tags
+    
+    @classmethod
+    def call_subtype(cls) -> set:
+        registry = cls.load_registry()
+        subtypes = set()
+
+        for item in registry:
+            subtypes.update(item["subtype"])
+        
+        return subtypes
 
 class SummaryIndex():
     """
@@ -989,22 +1020,6 @@ class DayLog():
 
 # Working Code
 def main():
-    # Test = Item("testing", "testing", "1", 2.0, "3")
-    # ItemRegistry.delete_item('testing')
-    # ItemRegistry.update_field('testing', 'name', 'test')
-    item = Item("Apple", "food", "non-ingredient", 95.0, [], "Walmart")
-    # assert item.name == "apple"
-    Item.update_field(item, "item_type", "test")
-    assert item.item_type == "test"
-    # assert item.item_type == "food"
-    # assert item.sub_type == "non-ingredient"
-    # assert item.kcal == 95.0
-    # assert item.brand == "walmart"
-    # assert isinstance(item.id, str)
-    # assert item.tags == []
-    # assert item.time == 0.0
-    # assert isinstance(item.data, dict)
-    # assert isinstance(item.makeup, list)
     pass
 
 if __name__ == '__main__':
