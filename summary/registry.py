@@ -4,15 +4,17 @@ import csv, json
 if TYPE_CHECKING:
     from items import Item, Food, Recipe, Workout, Supplement
 
+from constants import REGISTRY_HEADERS, INDEX_HEADERS
+
 class Registry():
     """
     Stores and manages all registered items.
     Automatically updates index and dependents when items change.
     """
 
-    headers = ['id', 'name', 'item_type', 'sub_type', 'brand', 'kcal',
-                  'time', 'data', 'makeup', 'tags']
+    headers = REGISTRY_HEADERS
     registry_file = "item_registry.csv"
+    _cache = None
 
     @classmethod
     def register_item(cls, row):
@@ -24,45 +26,31 @@ class Registry():
     
     @classmethod
     def load_registry(cls) -> List[dict]:
-        """
-        Returns a list of all items and their attributes in the registry with each item row being a dictionary 
-        with python objects for certian attributes.
-
-        Output: [{'id': 't001', 'name': 'testing', 'item_type': 'testing', 'sub_type': '1', 'brand': '3', 'kcal': 2.0, 'time': 0.0, 'data': {}, 'makeup': [], 'tags': []}]
-        """
-
-        # Easily called to gain all information and parse through everything for any method that needs it.
-
+        if cls._cache is not None:
+            return cls._cache
+        
         registry = []
-
         with open(cls.registry_file, 'r', newline='', encoding='utf-8') as f_in:
             reader = csv.DictReader(f_in)
             for row in reader:
                 cleaned = {}
-
                 for key, value in row.items():
                     value = value.strip()
-
-                    # takes the list and dictionary attributes and codes them back into python objects
                     if key in ['data', 'makeup', 'tags']:
                         try:
                             cleaned[key] = json.loads(value) if value else {} if key == 'data' else []
                         except json.JSONDecodeError:
                             cleaned[key] = {} if key == 'data' else []
-
-                    # takes the float attributes and codes them back into python objects
                     elif key in ['kcal', 'time']:
                         try:
                             cleaned[key] = float(value)
                         except ValueError:
                             cleaned[key] = 0.0
-
-                    # everything else is just added back on, as is.
                     else:
                         cleaned[key] = value
-
                 registry.append(cleaned)
-
+        
+        cls._cache = registry
         return registry
     
     @classmethod
@@ -91,9 +79,8 @@ class Registry():
                     row[field] = json.dumps(row.get(field, {} if field == 'data' else []))
                 writer.writerow(row)
         
+        cls._cache = None
         Index.save_index()    
-    
-        pass
     
     @classmethod
     def resolve_id_by_name(cls, name: str) -> str | None:
@@ -146,14 +133,15 @@ class Registry():
         original_len = len(registry)
 
         # Finds the item row based on id
-        item = cls.get_item(id)
-        if not item:
+        item_dict = cls.get_item(id)
+        if not item_dict:
             return False
-        
+
+        item = cls.instantiate_item(item_dict)
+
         # Validates deletion with the user
         print(f"\nYou are about to delete the following item:")
-        for key, value in item.items():
-            print(f"  {key}: {value}")
+        print(item.summary())  # or implement a method that returns formatted info string
         confirm = input("Are you sure you want to delete this item? (y/n): ").strip().lower()
 
         if confirm not in ('y', 'yes'):
@@ -216,8 +204,7 @@ class Registry():
         if found == False:
             raise ValueError(f"Item with name '{name}' not found in registry.")
         
-        method_func = getattr(method_class, method)
-        return method_func(item, *args)
+        return getattr(item, method)(*args)
     
     @classmethod
     def update_dependents(cls, item_id):
@@ -288,7 +275,7 @@ class Registry():
         tags = set()
 
         for item in registry:
-            tags.update(item["tags"])
+            tags.update(item.get("tags", []))
         
         return tags
     
@@ -298,7 +285,7 @@ class Registry():
         subtypes = set()
 
         for item in registry:
-            subtypes.update(item["subtype"])
+            subtypes.add(item.get("subtype", ""))
         
         return subtypes
 
@@ -312,23 +299,21 @@ class Index():
     # Interactions:
         # Called by Registry and AdvancedSearch
     
-    headers = ['id', 'name', 'brand']
+    headers = INDEX_HEADERS
     index_file = 'summary/Index.csv'
+    _cache = None
 
     @classmethod
     def load_index(cls):
-        """
-        Return a list (or dictionary) of all items currently tracked in the summary index, likely read from a CSV file (which stores rows where each entry is a JSON string).
-        """
-        # cls.save_index()
-
-        index = []
+        if cls._cache is not None:
+            return cls._cache
         
-        with open (cls.index_file, 'r', newline='', encoding='utf-8') as f_in:
+        index = []
+        with open(cls.index_file, 'r', newline='', encoding='utf-8') as f_in:
             reader = csv.DictReader(f_in)
-            for row in reader:
-                index.append(row)
+            index = list(reader)
 
+        cls._cache = index
         return index
     
     @classmethod
@@ -348,6 +333,8 @@ class Index():
             writer = csv.DictWriter(f_out, fieldnames=cls.headers)
             writer.writeheader()
             writer.writerows(summary_data)
+
+        cls._cache = None
     
     @classmethod
     def search_name(cls, query):
