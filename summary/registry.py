@@ -53,7 +53,7 @@ class Registry():
             
             # if the registry is empty, don't save it.
             if not registry:
-                return
+                return False
             
             writer = csv.DictWriter(f_out, fieldnames=cls.headers)
             writer.writeheader()
@@ -72,20 +72,14 @@ class Registry():
     
     @classmethod
     def get_item_object(cls, id_or_name) -> Optional['Item']:
-        """
-        Given an id or name, return the instantiated item object, or None if not found.
-        """
-        if id_or_name.isalpha():
-            item_id = cls.resolve_id_by_name(id_or_name)
-            if not item_id:
-                return None
-            item_dict = cls.get_item_dict(item_id)        
-        elif id_or_name.startswith(('f', 'r', 'w', 's')):  # example prefix for id types, adjust as needed
-            item_dict = cls.get_item_dict(id_or_name)            
-        
-        if item_dict is None:
+        item_id = cls.resolve_id(id_or_name)
+        if not item_id:
             return None
         
+        item_dict = cls.get_item_dict(item_id)
+        if not item_dict:
+            return None
+
         return cls.from_dict(item_dict)
     
     @classmethod
@@ -305,6 +299,7 @@ class Registry():
                 try:
                     cleaned[key] = json.loads(value) if value else ({} if key == 'data' else [])
                 except json.JSONDecodeError:
+                    print(f"Warning: Failed to parse JSON for key '{key}' in row: {row}")
                     cleaned[key] = {} if key == 'data' else []
             elif key in ['kcal', 'time']:
                 try:
@@ -325,6 +320,7 @@ class Registry():
         filtered = cls.filter_registry(lambda item: item['id'] == id)
         if filtered:
             return filtered[0]
+        print(f"Warning: No item found in registry with id '{id}'")
         return None
 
     @classmethod
@@ -336,7 +332,31 @@ class Registry():
     def resolve_id(cls, id_or_name: str) -> Optional[str]:
         if id_or_name.isalpha():
             return cls.resolve_id_by_name(id_or_name)
-        return id_or_name if cls.get_item_dict(id_or_name) else None
+        if Index.id_exists(id_or_name):
+            return id_or_name
+        return None
+
+    @classmethod
+    def clear_all_items(cls) -> None:
+        """
+        Removes all items from the registry and index files while preserving the headers.
+        Also resets internal caches.
+        """
+        y_or_n_r = input('Are you sure you want to clear the registry? (y/n) ')
+        if y_or_n_r.lower() == 'yes':
+            # Clear the registry file
+            with open(cls.registry_file, 'w', newline='', encoding='utf-8') as f_reg:
+                writer = csv.DictWriter(f_reg, fieldnames=cls.headers)
+                writer.writeheader()
+            cls._cache = None
+        
+        y_or_n_i = input('Are you sure you want to clear the index? (y/n)')
+        if y_or_n_i.lower() == 'yes':
+            # Clear the index file
+            with open(Index.index_file, 'w', newline='', encoding='utf-8') as f_idx:
+                writer = csv.DictWriter(f_idx, fieldnames=Index.headers)
+                writer.writeheader()
+            Index._cache = None
 
 class Index():
     """
@@ -391,3 +411,8 @@ class Index():
        query = query.lower().strip()
        summary = cls.load_index()
        return [item for item in summary if query in item['name'].lower()]
+    
+    @classmethod
+    def id_exists(cls, item_id: str) -> bool:
+        summary = cls.load_index()
+        return any(row['id'] == item_id for row in summary)
