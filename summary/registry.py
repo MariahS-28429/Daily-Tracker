@@ -313,7 +313,7 @@ class Index():
         # Called by Registry and AdvancedSearch
     
     headers = ['id', 'name', 'brand']
-    index_file = 'summary_index.csv'
+    index_file = 'summary/Index.csv'
 
     @classmethod
     def load_index(cls):
@@ -348,12 +348,6 @@ class Index():
             writer = csv.DictWriter(f_out, fieldnames=cls.headers)
             writer.writeheader()
             writer.writerows(summary_data)
-    
-    def update_entry(item):
-        pass
-    
-    def delete_entry(item_id):
-        pass
     
     @classmethod
     def search_name(cls, query):
