@@ -171,7 +171,8 @@ class Item():
             if field_name in {'data', 'kcal'}:
                 self.auto_update_dependents()
 
-        Registry.register_item(self.to_registry_dict())
+        # Now save updated object back to the registry
+        Registry.update_item_by_id(self.id, self.to_registry_dict())
         return True
 
     def auto_update_dependents(self, change: str = None) -> bool:
@@ -209,50 +210,44 @@ class Item():
             Registry.update_dependents(self.id)
             return True
 
-    # --- Tag Management ---
+    # --- Data Management ---
     
-    def add_tag(self, tag) -> bool:
+    def add_tag(self, tag: str) -> bool:
         """
         Add a tag to this item and update the registry if changed.
 
         Args:
             tag (str): Tag to add.
+
+        Returns:
+            bool: True if added, False otherwise.
         """
+        tag = tag.lower()
 
-        if not tag in self.tags:
+        if tag not in self.tags:
             self.tags.append(tag)
+            Registry.update_item_by_id(self.id, self.to_registry_dict())
+            return True
 
-            registry = Registry.load_registry()
-            for row in registry:
-                if row['id'] == self.id:
-                    if not tag in row['tags']:
-                        row["tags"].append(tag)
-                        Registry.save_registry(registry)
-                        return True
-                    break
-        
         return False
 
-    def delete_tag(self, tag) -> bool:
+    def delete_tag(self, tag: str) -> bool:
         """
         Remove a tag from this item and update the registry if changed.
 
         Args:
             tag (str): Tag to remove.
+
+        Returns:
+            bool: True if removed, False otherwise.
         """
-        
+        tag = tag.lower()
+
         if tag in self.tags:
             self.tags.remove(tag)
+            Registry.update_item_by_id(self.id, self.to_registry_dict())
+            return True
 
-            registry = Registry.load_registry()
-            for row in registry:
-                if row['id'] == self.id:
-                    if tag in row["tags"]:
-                        row["tags"].remove(tag)
-                        Registry.save_registry(registry)
-                        return True
-                    break
-        
         return False
     
     def has_tag(self, tag: str) -> bool:
@@ -267,6 +262,31 @@ class Item():
         """
 
         return tag.lower() in self.tags
+    
+    def add_to_makeup(self, component_id: str) -> bool:
+        """
+        Adds another item's ID to this item's makeup list.
+
+        Args:
+            component_id (str): The ID of the item to add.
+
+        Returns:
+            bool: True if added, False if already present.
+        """
+        if not hasattr(self, "makeup") or not isinstance(self.makeup, list):
+            self.makeup = []
+
+        # Check if already present
+        if any(part.get('id') == component_id for part in self.makeup):
+            print(f"Item {component_id} is already in makeup.")
+            return False
+
+        # Add as a dict (if your format uses more fields, adjust here)
+        self.makeup.append({'id': component_id})
+        Registry.update_item_by_id(self.id, self.to_registry_dict())
+        Registry.update_dependents(self.id)  # optional, if this should cascade
+
+        return True
     
     # --- Display and Reporting ---
 

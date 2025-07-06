@@ -37,3 +37,9 @@ class Workout(Item):
     
     def recalculate():
         pass
+
+    def from_dict():
+        pass
+
+    def summary():
+        pass

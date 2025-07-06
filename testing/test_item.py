@@ -7,19 +7,19 @@ class TestItem(unittest.TestCase):
     def setUp(self):
         # Patch Index.load_index and Registry methods
         patcher_index = patch('summary.Index.load_index', return_value = [])
-        patcher_register = patch('summary.Registry.register_item')
+        patcher_update = patch('summary.Registry.update_item_by_id')
         patcher_get_using = patch('summary.Registry.get_items_using', return_value=[])
         patcher_load_registry = patch('summary.Registry.load_registry', return_value=[])
         patcher_save_registry = patch('summary.Registry.save_registry')
 
         self.mock_load_index = patcher_index.start()
-        self.mock_register = patcher_register.start()
+        self.mock_update = patcher_update.start()
         self.mock_get_items_using = patcher_get_using.start()
         self.mock_load_registry = patcher_load_registry.start()
         self.mock_save_registry = patcher_save_registry.start()
 
         self.addCleanup(patcher_index.stop)
-        self.addCleanup(patcher_register.stop)
+        self.addCleanup(patcher_update.stop)
         self.addCleanup(patcher_get_using.stop)
         self.addCleanup(patcher_load_registry.stop)
         self.addCleanup(patcher_save_registry.stop)
@@ -79,8 +79,8 @@ class TestItem(unittest.TestCase):
             self.assertTrue(new_id.startswith('s'))
             mock_auto_update.assert_called_with(new_id)
             
-            self.mock_register.assert_called_once()
-            self.assertEqual(self.mock_register.call_args[0][0]['item_type'], 'supplement')
+            self.mock_update.assert_called_once()
+            self.assertEqual(self.mock_update.call_args[0][1]['item_type'], 'supplement')
 
 
     def test_auto_update_dependents_with_change(self):
@@ -167,6 +167,30 @@ class TestItem(unittest.TestCase):
         self.assertIn("Genericbrand", summary)
         self.assertIn("100 kcal", summary)
         self.assertIn("tag1", summary)
+
+    def test_add_to_makeup(self):
+        item = Item("Trail Mix", "Recipe", "Snack", 300, [], "Generic")
+
+        with patch('summary.Registry.update_item_by_id') as mock_update_item, \
+             patch('summary.Registry.update_dependents') as mock_update_dependents:
+            
+            # First time adding
+            result_1 = item.add_to_makeup("f001")
+            self.assertTrue(result_1)
+            self.assertIn({'id': 'f001'}, item.makeup)
+            mock_update_item.assert_called_once_with(item.id, item.to_registry_dict())
+            mock_update_dependents.assert_called_once_with(item.id)
+
+            # Reset mocks for next check
+            mock_update_item.reset_mock()
+            mock_update_dependents.reset_mock()
+
+            # Attempt duplicate
+            result_2 = item.add_to_makeup("f001")
+            self.assertFalse(result_2)
+            self.assertEqual(item.makeup.count({'id': 'f001'}), 1)
+            mock_update_item.assert_not_called()
+            mock_update_dependents.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

@@ -63,3 +63,9 @@ class Recipe(Item):
 
     def recalculate():
         pass
+
+    def from_dict():
+        pass
+
+    def summary():
+        pass
