@@ -1,39 +1,41 @@
-import csv, json, sys, re, os
-from typing import List, Dict, Any
+from typing import List
 
+from helper import CheckType
+from summary import Index, Registry
 
 class Item():
     """
-    Abstract base class for all items in the nutritional planner.
+    Abstract base class for all items in the day log.
 
-    Handles shared attributes such as name, kcal, tags, and methods for serialization.
-    Subclasses like Food, Recipe, etc., inherit from this to ensure a consistent structure.
+    Represents a generalized data structure for nutrition-related entities like foods,
+    recipes, workouts, and supplements.
 
-    Used by:
-    - Subclasses (e.g., Food, Recipe, Workout)
-    - Registry (for saving/loading data)
-    - Calculator and DayLog (via methods like to_registry_dict)
-    """
-    
-    """
     Attributes:
-    - name (str): Lowercase name of the item
-    - item_type (str): 'food', 'recipe', etc.
-    - sub_type (str): 'ingredient', 'meal', etc.
-    - kcal (float): Caloric value
-    - brand (str): Brand name in lowercase
-    - id (str): Unique identifier generated
-    - tags (list): List of associated tags
-    - time (float): Optional time-related metric (e.g. cooking time)
-    - data (dict): Extra metadata
-    - makeup (list): Used in recipes to store ingredient composition
+        name (str): Normalized lowercase name of the item.
+        item_type (str): Category ('food', 'recipe', etc.).
+        sub_type (str): Subcategory ('ingredient', 'meal', etc.).
+        brand (str): Brand name in lowercase.
+        id (str): Unique ID generated using item_type.
+        kcal (float): Caloric value, default is 0.0 unless overridden.
+        tags (list): List of lowercase tag strings.
+        time (float): Optional time value, such as cooking or workout time.
+        data (dict): Optional metadata dictionary.
+        makeup (list): Used by composite items (like recipes) to store sub-item IDs.
     """
     
+    # --- Initialization and ID Management ---
+
     def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str):
         """
         Initialize all attributes for an item. Autosaves the item to the registry upon initialization.
 
-        Input: ('apple', 'food', 'non-ingredient', 95.0, ['fruit'], 'Walmart'), etc.
+        Args:
+            item_name (str): Name of the item.
+            item_type (str): Type/category of the item.
+            sub_type (str): Subcategory of the item.
+            kcal (float): Calorie count.
+            tags (List[str]): List of tags associated with the item.
+            brand (str): Brand name.
         """
 
         # Attributes that are brought in. Will always be defined in every child class
@@ -43,22 +45,23 @@ class Item():
         self.brand = CheckType.is_string(brand).lower()
         self.id = self.id_gen()
         self.tags = CheckType.is_list(tags)
+        self.kcal = kcal
         
         # Attributes are aren't brought in. Only used in some child classes
         self.time = 0.0
         self.data = {}
         self.makeup = []
-        self.kcal = 0.0
 
     def id_gen(self):
         """
         Generate the lowest available unique ID for this item based on its type prefix.
 
-        Ex: 'f001', 'r002', 'w003', 's004', etc.
+        Returns:
+            str: A unique ID string like 'f001', 'r002', etc.
         """
 
         prefix = self.item_type[0]
-        summary = SummaryIndex.load_index()
+        summary = Index.load_index()
         
         # generates a list of used id's in the class
         used_numbers = []
@@ -79,9 +82,14 @@ class Item():
         
         return f"{prefix}{next_num:03d}"
     
+    # --- Serialization ---
+
     def to_registry_dict(self):
         """
-        Return a full dict of the item for serialization to registry.
+        Serialize the item into a dictionary for registry storage.
+
+        Returns:
+            dict: Dictionary representation of the item.
         """
         
         return {
@@ -97,43 +105,87 @@ class Item():
             'makeup': self.makeup
         }
 
+    @classmethod
+    def from_dict(cls, data: dict):
+        """
+        Basic fallback method to create an Item instance from a dictionary.
+
+        Child classes should override this method to handle their specific fields.
+
+        Args:
+            data (dict): Dictionary containing item data.
+
+        Returns:
+            Item: An instance of Item with available basic fields set.
+        """
+        item_name = data.get("name", "unknown")
+        item_type = data.get("item_type", "unknown")
+        sub_type = data.get("sub_type", "unknown")
+        tags = data.get("tags", [])
+        brand = data.get("brand", "unknown")
+        kcal = data.get("kcal", 0.0)
+
+        # Create an instance with minimal data, ignoring extra fields.
+        # This won't include specialized attributes in child classes.
+        return cls(
+            item_name=item_name,
+            item_type=item_type,
+            sub_type=sub_type,
+            kcal=kcal,
+            tags=tags,
+            brand=brand
+        )
+    
+    # --- Field Updates and Dependent Updates ---
+    
     def update_field(self, field_name: str, new_value):
         """
-        Lets the user update a field for an already existing item (if the item has been made in the same code and doesn't only exist in the registry)
+        Update an attribute of the item and notify dependents if necessary.
 
-        Input: Item.update_field(item, "name", "green apple")
-        Output: True
+        Args:
+            field_name (str): The name of the field to update.
+            new_value: The new value to assign.
+
+        Returns:
+            bool: True if updated successfully, False if invalid field.
         """
-        # checks that the field_name is valid
-        if field_name not in vars(self).keys():
+
+        if field_name not in vars(self):
             print(f"'{field_name}' is not a valid field name.")
             return False
-        
-        # updates id if the item_type is changed and updates all dependents to change to the new id
+
+        new_value = new_value.lower() if isinstance(new_value, str) else new_value
+
         if field_name == 'item_type':
+            self.item_type = new_value
             new_id = self.id_gen()
             self.auto_update_dependents(new_id)
             self.id = new_id
-        
+
         elif field_name == 'id':
             self.auto_update_dependents(new_value)
+            self.id = new_value
 
-        setattr(self, field_name, new_value)
+        else:
+            setattr(self, field_name, new_value)
+            if field_name in {'data', 'kcal'}:
+                self.auto_update_dependents()
 
-        if field_name == 'data' or field_name == 'kcal':
-            self.auto_update_dependents()
-
-        ItemRegistry.register_item(self.to_registry_dict())
-        return True        
+        Registry.register_item(self.to_registry_dict())
+        return True
 
     def auto_update_dependents(self, change = None):
         """
-        Notify the registry to update all items (recipes/daylogs) that reference this item.
+        Notify the Registry to update all items (recipes, daylogs, etc.) that reference this item.
+
+        Args:
+            change (str, optional): New ID if this item’s ID has changed.
         """
+
         # changes the item's id in its depenents for future reference
         if change:
-            dependents = ItemRegistry.get_items_using(self.id)
-            registry = ItemRegistry.load_registry()
+            dependents = Registry.get_items_using(self.id)
+            registry = Registry.load_registry()
             updated = False
 
             if dependents:
@@ -148,42 +200,100 @@ class Item():
                             break
             
             if updated:
-                ItemRegistry.save_registry(registry)
+                Registry.save_registry(registry)
         
         else:
-            ItemRegistry.update_dependents(self.id)
+            Registry.update_dependents(self.id)
 
-    def __str__(self):
-        return (f"{self.name.title()} [{self.item_type}/{self.sub_type}] - "
-            f"{self.kcal} kcal - Brand: {self.brand.title()}")
-
-    def __repr__(self):
-        return (f"Item(name={self.name!r}, item_type={self.item_type!r}, "
-            f"sub_type={self.sub_type!r}, kcal={self.kcal!r}, brand={self.brand!r})")
-
-    def delete_tag(self, tag):
-        if tag in self.tags:
-            self.tags.remove()
-
-            registry = ItemRegistry.load_registry()
-            for row in registry:
-                if row['id'] == self.id:
-                    if tag in row["tags"]:
-                        row["tags"].remove(tag)
-                        ItemRegistry.save_registry(registry)
-                    break
-
+    # --- Tag Management ---
+    
     def add_tag(self, tag):
+        """
+        Add a tag to this item and update the registry if changed.
+
+        Args:
+            tag (str): Tag to add.
+        """
+
         if not tag in self.tags:
             self.tags.append(tag)
 
-            registry = ItemRegistry.load_registry()
+            registry = Registry.load_registry()
             for row in registry:
                 if row['id'] == self.id:
                     if not tag in row['tags']:
                         row["tags"].append(tag)
-                        ItemRegistry.save_registry(registry)
+                        Registry.save_registry(registry)
                     break
 
+    def delete_tag(self, tag):
+        """
+        Remove a tag from this item and update the registry if changed.
+
+        Args:
+            tag (str): Tag to remove.
+        """
+        
+        if tag in self.tags:
+            self.tags.remove(tag)
+
+            registry = Registry.load_registry()
+            for row in registry:
+                if row['id'] == self.id:
+                    if tag in row["tags"]:
+                        row["tags"].remove(tag)
+                        Registry.save_registry(registry)
+                    break
+    
+    def has_tag(self, tag: str) -> bool:
+        """
+        Check if the item has a specific tag.
+
+        Args:
+            tag (str): Tag to check for.
+
+        Returns:
+            bool: True if tag exists, False otherwise.
+        """
+
+        return tag.lower() in self.tags
+    
+    # --- Magic Methods ---
+    
+    def __str__(self):
+        """
+        String representation for user-friendly display.
+        """
+        
+        return (f"{self.name.title()} [{self.item_type}/{self.sub_type}] - "
+            f"{self.kcal} kcal - Brand: {self.brand.title()}")
+
+    def __repr__(self):
+        """
+        Official string representation useful for debugging.
+        """
+        
+        return (f"Item(name={self.name!r}, item_type={self.item_type!r}, "
+            f"sub_type={self.sub_type!r}, kcal={self.kcal!r}, brand={self.brand!r})")
+ 
     def __eq__(self, other):
-        return isinstance(other, Item) and self.to_registry_dict() == other.to_registry_dict()
+        """
+        Equality check based on core attributes.
+
+        Args:
+            other (Item): Another item to compare.
+
+        Returns:
+            bool: True if equivalent, False otherwise.
+        """
+        
+        if not isinstance(other, Item):
+            return False
+        return (
+            self.name == other.name and
+            self.item_type == other.item_type and
+            self.sub_type == other.sub_type and
+            self.kcal == other.kcal and
+            self.brand == other.brand and
+            self.tags == other.tags
+        )
