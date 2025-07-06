@@ -84,13 +84,6 @@ class Item():
         
         return f"{prefix}{next_num:03d}"
     
-    def to_summary_dict(self) -> Dict[str, Any]:
-        """
-        Return a lightweight dict with ID and name for the summary index 
-        """
-
-        return {'id': self.id, 'name': self.name, 'brand': self.brand}
-    
     def to_registry_dict(self):
         """
         Return a full dict of the item for serialization to registry.
@@ -699,8 +692,7 @@ class ItemRegistry():
                     row[field] = json.dumps(row.get(field, {} if field == 'data' else []))
                 writer.writerow(row)
         
-        SummaryIndex.save_index()
-    
+        SummaryIndex.save_index()    
     
         pass
     
@@ -791,7 +783,7 @@ class ItemRegistry():
         if field_name not in cls.headers:
             print(f"'{field_name}' is not a valid field name.")
             return False
-        
+
         # finds the id for the item
         id = cls.resolve_id_by_name(item_name)
         if not id:
