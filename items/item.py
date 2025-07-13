@@ -127,14 +127,16 @@ class Item():
 
         # Create an instance with minimal data, ignoring extra fields.
         # This won't include specialized attributes in child classes.
-        return cls(
+        obj = cls(
             item_name=item_name,
             item_type=item_type,
             sub_type=sub_type,
             kcal=kcal,
             tags=tags,
-            brand=brand
+            brand=brand, save = False
         )
+        obj.id = data.get("id", obj.id)
+        return obj
     
     # --- Field Updates and Dependent Updates ---
     
