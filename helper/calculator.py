@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from ..items import Item, Recipe
+    from ..items import Item, Recipe, Food
 
 from type import CheckType
 
@@ -28,6 +28,44 @@ class NutritionalCalculator():
     def calculate_daylog_totals():
         pass
 
+    def total_amounts_based_on_serving(): # Outputs the total nutritional data for a total of all the servings (as opposed to the default serving size nutrition)
+        pass
+
+    @staticmethod
+    def total_weight(item: Union[Food, Recipe) -> float: # CHATGPT GENERATED, HAVEN'T CHECKED YET
+        if isinstance(item, Food):
+            s = item.data["serving_information"]
+            return s["serving_size"] * s["servings"]
+        elif isinstance(item, Recipe):
+            return sum(NutritionalCalculator.total_weight(i) for i in item.ingredients)
+        else:
+            raise TypeError("Item must be a Food or Recipe.")
+        
+    @staticmethod
+    def nutrient_density_score(item: Union[Food, Recipe], method: str = "per_kcal") -> float: # CHATGPT GENERATED, HAVEN'T CHECKED YET
+        """
+        Calculate a crude nutrient density score for a food or recipe.
+        
+        method: "per_kcal", "per_gram", or "rdi"
+        """
+        n = item.data["nutrition"]
+        nutrients = [n["fiber"], n["iron"], n["calcium"], n["vitamin_d"], n["potassium"]]
+
+        if method == "per_kcal":
+            return sum(nutrients) / item.kcal * 100 if item.kcal else 0
+
+        elif method == "per_gram":
+            weight = NutritionalCalculator.total_weight(item)
+            return sum(nutrients) / weight if weight else 0
+
+        elif method == "rdi":
+            from .constants import RDI  # Assuming you have a shared constants module
+            rdi_sum = sum(nutrient / RDI[name] for nutrient, name in zip(nutrients, ["fiber", "iron", "calcium", "vitamin_d", "potassium"]))
+            return rdi_sum * 100  # Percent of RDI sum
+
+        else:
+            raise ValueError(f"Invalid method: {method}")
+
     @staticmethod
     def kcal_from_macros(item: 'Item', food: bool = True):
         if food:
@@ -38,7 +76,7 @@ class NutritionalCalculator():
             return 0.0
 
     @classmethod
-    def check_nutritional_data(cls, item: 'Item', food: bool = True): #NOT FINISHED. Needs more checking, such as the total of the fats.
+    def check_nutritional_data(cls, item: 'Item', food: bool = True): 
         if food:
             cls.check_total_fat_to_fats(item)
             cls.check_total_sugar_to_sugars(item)

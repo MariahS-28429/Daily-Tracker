@@ -31,3 +31,6 @@ class AdvancedSearch():
     def filter_items(predicate_fuction):
         """Allows custom filter logic"""
         pass
+
+    def is_high_protein():
+        pass

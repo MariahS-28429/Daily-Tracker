@@ -187,3 +187,71 @@ class Food(Item):
         return (f"Cholesterol: {n['cholesterol']}mg | Sodium: {n['sodium']}mg | "
                 f"Fiber: {n['fiber']}g | Calcium: {n['calcium']}mg | "
                 f"Iron: {n['iron']}mg | Potassium: {n['potassium']}mg")
+
+    def compare_to(self, other: "Food") -> str: #CHATGPT MADE PLZ CHECK BEFORE SAYING ITS ALL GOOD
+        """
+        Compare this food to another food based on key nutritional values.
+        Includes directional differences (↑/↓/=/+/-).
+
+        Args:
+            other (Food): The other Food instance to compare with.
+
+        Returns:
+            str: A formatted string highlighting the differences.
+        """
+        if not isinstance(other, Food):
+            raise TypeError("Can only compare Food with another Food.")
+
+        def format_diff(val1, val2, unit="g"):
+            try:
+                diff = val2 - val1
+                if abs(diff) < 0.01:
+                    return "(=)"
+                arrow = "↑" if diff > 0 else "↓"
+                return f"({arrow} {diff:+.1f}{unit})"
+            except TypeError:
+                return "(n/a)"
+
+        lines = [f"Comparison: {self.item_name.title()} vs {other.item_name.title()}",
+                "Macronutrients (per container):"]
+
+        macros1 = self.data["nutrition"]["macros"]
+        macros2 = other.data["nutrition"]["macros"]
+
+        for key in ["protein", "carbs"]:
+            val1 = macros1.get(key, 0)
+            val2 = macros2.get(key, 0)
+            lines.append(f"  {key.title():<15}: {val1}g vs {val2}g  {format_diff(val1, val2)}")
+
+        for key in ["total_fat", "saturated_fat", "trans_fat"]:
+            name = key.replace("_", " ").title()
+            val1 = macros1["fats"].get(key, 0)
+            val2 = macros2["fats"].get(key, 0)
+            lines.append(f"  {name:<15}: {val1}g vs {val2}g  {format_diff(val1, val2)}")
+
+        lines.append(f"  {'Calories':<15}: {self.kcal} kcal vs {other.kcal} kcal  {format_diff(self.kcal, other.kcal, ' kcal')}")
+
+        n1 = self.data["nutrition"]
+        n2 = other.data["nutrition"]
+
+        # Fiber
+        fiber1 = n1.get("fiber", 0)
+        fiber2 = n2.get("fiber", 0)
+        lines.append(f"  {'Fiber':<15}: {fiber1}g vs {fiber2}g  {format_diff(fiber1, fiber2)}")
+
+        # Total Sugar
+        sugar1 = n1["sugars"].get("total_sugars", 0)
+        sugar2 = n2["sugars"].get("total_sugars", 0)
+        lines.append(f"  {'Total Sugar':<15}: {sugar1}g vs {sugar2}g  {format_diff(sugar1, sugar2)}")
+
+        # Cholesterol (mg)
+        chol1 = n1.get("cholesterol", 0)
+        chol2 = n2.get("cholesterol", 0)
+        lines.append(f"  {'Cholesterol':<15}: {chol1}mg vs {chol2}mg  {format_diff(chol1, chol2, 'mg')}")
+
+        # Sodium (mg)
+        sodium1 = n1.get("sodium", 0)
+        sodium2 = n2.get("sodium", 0)
+        lines.append(f"  {'Sodium':<15}: {sodium1}mg vs {sodium2}mg  {format_diff(sodium1, sodium2, 'mg')}")
+
+        return "\n".join(lines)
