@@ -34,3 +34,6 @@ class AdvancedSearch():
 
     def is_high_protein():
         pass
+
+    def matches_query():
+        pass
