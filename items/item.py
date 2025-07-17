@@ -45,7 +45,7 @@ class Item():
         self.brand = CheckType.is_string(brand).lower()
         self.id = self.id_gen()
         self.tags = CheckType.is_list(tags)
-        self.kcal = kcal
+        self.kcal = CheckType.is_float(kcal)
         
         # Attributes are aren't brought in. Only used in some child classes
         self.time = 0.0

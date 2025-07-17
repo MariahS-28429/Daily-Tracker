@@ -4,10 +4,22 @@ from summary import Registry
 
 class Food(Item):
     """
-    A basic food item with full nutritional data.
-    Inherits from Item.
+    Basic data model for a food item with full nutritional information.
+
+    Inherits from the Item class and adds support for serving details, macronutrients, 
+    and micronutrients. Validates inputs, stores structured data, and optionally registers 
+    the item in the global registry.
+
+    Attributes:
+        data (dict): A nested dictionary containing serving information and nutritional values.
     """
     
+    KCAL_PER_GRAM_PROTEIN = 4
+    KCAL_PER_GRAM_CARBS = 4
+    KCAL_PER_GRAM_FAT = 9
+
+    # --- Initialization ---
+
     def __init__(self, item_name: str, sub_type: str, kcal: float, tags: list, brand: str,
                  serving_size: float, serving_unit: str, servings: float, 
                  protein: float, carbs: float, total_fat: float, saturated_fat: float, trans_fat: float, 
@@ -37,45 +49,173 @@ class Food(Item):
                         "calcium": CheckType.is_float(calcium),
                         "iron": CheckType.is_float(iron),
                         "potassium": CheckType.is_float(potassium)}}
-        
+        """
+        Initialize a Food item with full nutritional and serving data.
+
+        Validates and structures nutritional information, optionally saving the item to the registry.
+
+        Args:
+            item_name (str): Name of the food item.
+            sub_type (str): Sub-category of the food.
+            kcal (float): Total calories.
+            tags (list): List of associated tags or keywords.
+            brand (str): Brand name of the food item.
+            serving_size (float): Size of a single serving.
+            serving_unit (str): Unit for serving size (e.g., g, oz).
+            servings (float): Number of servings per container.
+            protein (float): Protein content in grams.
+            carbs (float): Carbohydrate content in grams.
+            total_fat (float): Total fat content in grams.
+            saturated_fat (float): Saturated fat content in grams.
+            trans_fat (float): Trans fat content in grams.
+            cholesterol (float): Cholesterol in milligrams.
+            sodium (float): Sodium in milligrams.
+            fiber (float): Fiber in grams.
+            total_sugars (float): Total sugar content in grams.
+            added_sugars (float): Added sugar content in grams.
+            vitamin_d (float): Vitamin D content in micrograms.
+            calcium (float): Calcium content in milligrams.
+            iron (float): Iron content in milligrams.
+            potassium (float): Potassium content in milligrams.
+            save (bool, optional): Whether to save the item to the registry. Defaults to True.
+        """
+
         NutritionalCalculator.check_nutritional_data(self)
 
         if save:
             Registry.register_item(Item.to_registry_dict(self))
 
-    def edit_macros(self, macro_type: str, change: float):
-        macros = self.data["nutrition"]["macros"]
+    # --- Editing ---
+    
+    def edit_macros(self, macro_type: str, change: float) -> bool:
+        """
+        Modify the macronutrient value of a specific macro and update kcal accordingly.
 
-        if macro_type.lower() in ["protein", "carbs"]:
-            macros[macro_type] += CheckType.is_float(change)
+        Automatically recalculates kcal from updated macros and saves the changes to the registry.
+
+        Args:
+            macro_type (str): One of 'protein', 'carbs', 'total_fat', 'saturated_fat', or 'trans_fat'.
+            change (float): Amount to add (or subtract) from the current macro value.
+
+        Raises:
+            ValueError: If the macro type is not recognized.
+        """
+        macro_type = macro_type.lower()
+        macro_paths = {
+            "protein": ("nutrition", "macros", "protein"),
+            "carbs": ("nutrition", "macros", "carbs"),
+            "total_fat": ("nutrition", "macros", "fats", "total_fat"),
+            "saturated_fat": ("nutrition", "macros", "fats", "saturated_fat"),
+            "trans_fat": ("nutrition", "macros", "fats", "trans_fat"),
+        }
         
-        elif macro_type.lower() in ["total_fat", "saturated_fat", "trans_fat"]:
-            macros["fats"][macro_type] += CheckType.is_float(change)
-        
-        else:
-            raise ValueError(f"Invalid macro type: {macro_type}. Must be one of: "
-                            "'protein', 'carbs', 'total_fat', 'saturated_fat', 'trans_fat'.")
+        if macro_type not in macro_paths:
+            raise ValueError("Invalid macro input.")
+        d = self.data
+
+        for key in macro_paths[macro_type][:-1]:
+            d = d[key]
+        d[macro_paths[macro_type][-1]] += CheckType.is_float(change)
         
         self.kcal = NutritionalCalculator.kcal_from_macros(self)
 
-        Registry.update_item_by_id(self.id, Item.to_registry_dict(self))
+        return Registry.update_item_by_id(self.id, Item.to_registry_dict(self))
+    
+    # --- Display ---
+    
+    def summary(self) -> str:
+        """
+        Generate a formatted summary string for display purposes.
+
+        Includes food name, subtype, brand, serving size, servings per container, 
+        total kcal, and main macronutrients.
+
+        Returns:
+            str: Summary of the food item in readable format.
+        """
+
+        base = f"{self.name.title()} ({self.sub_type}), Brand: {self.brand.title()}"
+
+        serving = self.data.get("serving_information", {})
+        serving_size = serving.get("serving_size", "?")
+        serving_unit = serving.get("serving_unit", "")
+        servings = serving.get("servings", "?")
+        serving_info = f"Serving: {serving_size} {serving_unit}, Servings per container: {servings}"
+
+        protein, carbs, fat = self.get_macros()
+        kcal_str = f"{self.kcal} kcal" if self.kcal is not None else "No kcal info"
+
+        macro_summary = f"Protein: {protein}g | Carbs: {carbs}g | Fat: {fat}g"
+
+        return f"{base} | {serving_info} | {macro_summary} | {kcal_str}"
+    
+    def get_macro_ratio(self) -> str:
+        """
+        Calculate the macro calorie ratio as percentages of total kcal from macros.
+
+        Converts grams of protein, carbs, and fat into kcal and computes 
+        each as a percentage of total macro kcal.
+
+        Returns:
+            str: Formatted string representing macro ratio (e.g., "P:C:F = 40.0%:40.0%:20.0%").
+        """
+
+        protein_g, carbs_g, fat_g = self.get_macros()
+
+        # Convert grams to kcal
+        protein_kcal = protein_g * self.KCAL_PER_GRAM_PROTEIN
+        carbs_kcal = carbs_g * self.KCAL_PER_GRAM_CARBS
+        fat_kcal = fat_g * self.KCAL_PER_GRAM_FAT
+
+        total_macro_kcal = protein_kcal + carbs_kcal + fat_kcal
+
+        if total_macro_kcal == 0:
+            return "P:C:F = 0.0%:0.0%:0.0%"
+
+        # Calculate percentages
+        protein_pct = (protein_kcal / total_macro_kcal) * 100
+        carbs_pct = (carbs_kcal / total_macro_kcal) * 100
+        fat_pct = (fat_kcal / total_macro_kcal) * 100
+ 
+        return f"P:C:F = {protein_pct:.1f}%:{carbs_pct:.1f}%:{fat_pct:.1f}%"
+    
+    def get_micronutrient_summary(self) -> str:
+        """
+        Generate a summary string of key micronutrients.
+
+        Includes cholesterol, sodium, fiber, calcium, iron, and potassium.
+
+        Returns:
+            str: Summary of micronutrient content.
+        """
+
+        n = self.data["nutrition"]
+        return (f"Cholesterol: {n['cholesterol']}mg | Sodium: {n['sodium']}mg | "
+                f"Fiber: {n['fiber']}g | Calcium: {n['calcium']}mg | "
+                f"Iron: {n['iron']}mg | Potassium: {n['potassium']}mg")
+
+    # --- Serialization ---     
     
     @classmethod
     def from_dict(cls, data: dict) -> "Food":
         """
-        Creates a Food instance from a dictionary of data.
+        Create a Food instance from a dictionary of saved values.
+
+        Used when loading from a file or registry record. Assumes data is valid and 
+        matches the Food structure.
 
         Args:
-            data (dict): A dictionary with keys matching Food's structure.
+            data (dict): Dictionary containing food item data.
 
         Returns:
-            Food: A new Food object.
+            Food: A new Food object reconstructed from the data.
         """
-        item_name = CheckType.is_string(data["item_name"])
-        sub_type = CheckType.is_string(data["sub_type"])
-        kcal = CheckType.is_float(data["kcal"])
+
+        item_name = data["item_name"]
+        sub_type = data["sub_type"]
+        kcal = data["kcal"]
         tags = data.get("tags", [])
-        brand = CheckType.is_string(data["brand"])
+        brand = data["brand"]
 
         # Serving info
         serving_info = data["data"]["serving_information"]
@@ -115,143 +255,17 @@ class Food(Item):
         )
         obj.id = data.get("id", obj.id)
         return obj
-
-    def summary(self) -> str:
+    
+    # --- Helpers ---
+    
+    def get_macros(self) -> tuple:
         """
-        Generate a concise string summary of the food item.
-
-        Includes name, subtype, brand, serving information, calories,
-        and main macronutrients (protein, carbs, fat).
+        Retrieve the basic macro values: protein, carbs, and total fat.
 
         Returns:
-            str: Summary string.
+            tuple: (protein_g, carbs_g, total_fat_g)
         """
-        base = f"{self.item_name.title()} ({self.sub_type}), Brand: {self.brand.title()}"
-
-        serving = self.data.get("serving_information", {})
-        serving_size = serving.get("serving_size", "?")
-        serving_unit = serving.get("serving_unit", "")
-        servings = serving.get("servings", "?")
-        serving_info = f"Serving: {serving_size} {serving_unit}, Servings per container: {servings}"
-
+        
         macros = self.data.get("nutrition", {}).get("macros", {})
         fats = macros.get("fats", {})
-        protein = macros.get("protein", "?")
-        carbs = macros.get("carbs", "?")
-        fat = fats.get("total_fat", "?")
-        kcal_str = f"{self.kcal} kcal" if self.kcal is not None else "No kcal info"
-
-        macro_summary = f"Protein: {protein}g | Carbs: {carbs}g | Fat: {fat}g"
-
-        return f"{base} | {serving_info} | {macro_summary} | {kcal_str}"
-    
-    def get_macro_ratio(self) -> str:
-        """
-        Returns the macronutrient ratio (protein, carbs, fat) as percentages of total macro-based kcal.
-
-        Returns:
-            tuple: (protein%, carbs%, fat%)
-        """
-        macros = self.data["nutrition"]["macros"]
-        fats = macros["fats"]
-
-        protein_g = macros["protein"]
-        carbs_g = macros["carbs"]
-        fat_g = fats["total_fat"]
-
-        # Convert grams to kcal
-        protein_kcal = protein_g * 4
-        carbs_kcal = carbs_g * 4
-        fat_kcal = fat_g * 9
-
-        total_macro_kcal = protein_kcal + carbs_kcal + fat_kcal
-
-        if total_macro_kcal == 0:
-            return (0.0, 0.0, 0.0)
-
-        # Calculate percentages
-        protein_pct = (protein_kcal / total_macro_kcal) * 100
-        carbs_pct = (carbs_kcal / total_macro_kcal) * 100
-        fat_pct = (fat_kcal / total_macro_kcal) * 100
- 
-        return f"P:C:F = {round(protein_pct, 1):.1f}%:{round(carbs_pct, 1):.1f}%:{round(fat_pct, 1):.1f}%"
-    
-    def get_micronutrient_summary(self) -> str:
-        """
-        Returns a string summarizing key micronutrients.
-
-        Returns:
-            str: Micronutrient summary.
-        """
-        n = self.data["nutrition"]
-        return (f"Cholesterol: {n['cholesterol']}mg | Sodium: {n['sodium']}mg | "
-                f"Fiber: {n['fiber']}g | Calcium: {n['calcium']}mg | "
-                f"Iron: {n['iron']}mg | Potassium: {n['potassium']}mg")
-
-    def compare_to(self, other: "Food") -> str: #CHATGPT MADE PLZ CHECK BEFORE SAYING ITS ALL GOOD
-        """
-        Compare this food to another food based on key nutritional values.
-        Includes directional differences (↑/↓/=/+/-).
-
-        Args:
-            other (Food): The other Food instance to compare with.
-
-        Returns:
-            str: A formatted string highlighting the differences.
-        """
-        if not isinstance(other, Food):
-            raise TypeError("Can only compare Food with another Food.")
-
-        def format_diff(val1, val2, unit="g"):
-            try:
-                diff = val2 - val1
-                if abs(diff) < 0.01:
-                    return "(=)"
-                arrow = "↑" if diff > 0 else "↓"
-                return f"({arrow} {diff:+.1f}{unit})"
-            except TypeError:
-                return "(n/a)"
-
-        lines = [f"Comparison: {self.item_name.title()} vs {other.item_name.title()}",
-                "Macronutrients (per container):"]
-
-        macros1 = self.data["nutrition"]["macros"]
-        macros2 = other.data["nutrition"]["macros"]
-
-        for key in ["protein", "carbs"]:
-            val1 = macros1.get(key, 0)
-            val2 = macros2.get(key, 0)
-            lines.append(f"  {key.title():<15}: {val1}g vs {val2}g  {format_diff(val1, val2)}")
-
-        for key in ["total_fat", "saturated_fat", "trans_fat"]:
-            name = key.replace("_", " ").title()
-            val1 = macros1["fats"].get(key, 0)
-            val2 = macros2["fats"].get(key, 0)
-            lines.append(f"  {name:<15}: {val1}g vs {val2}g  {format_diff(val1, val2)}")
-
-        lines.append(f"  {'Calories':<15}: {self.kcal} kcal vs {other.kcal} kcal  {format_diff(self.kcal, other.kcal, ' kcal')}")
-
-        n1 = self.data["nutrition"]
-        n2 = other.data["nutrition"]
-
-        # Fiber
-        fiber1 = n1.get("fiber", 0)
-        fiber2 = n2.get("fiber", 0)
-        lines.append(f"  {'Fiber':<15}: {fiber1}g vs {fiber2}g  {format_diff(fiber1, fiber2)}")
-
-        # Total Sugar
-        sugar1 = n1["sugars"].get("total_sugars", 0)
-        sugar2 = n2["sugars"].get("total_sugars", 0)
-        lines.append(f"  {'Total Sugar':<15}: {sugar1}g vs {sugar2}g  {format_diff(sugar1, sugar2)}")
-
-        # Cholesterol (mg)
-        chol1 = n1.get("cholesterol", 0)
-        chol2 = n2.get("cholesterol", 0)
-        lines.append(f"  {'Cholesterol':<15}: {chol1}mg vs {chol2}mg  {format_diff(chol1, chol2, 'mg')}")
-
-        # Sodium (mg)
-        sodium1 = n1.get("sodium", 0)
-        sodium2 = n2.get("sodium", 0)
-        lines.append(f"  {'Sodium':<15}: {sodium1}mg vs {sodium2}mg  {format_diff(sodium1, sodium2, 'mg')}")
-
-        return "\n".join(lines)
+        return macros.get("protein", 0), macros.get("carbs", 0), fats.get("total_fat", 0)
