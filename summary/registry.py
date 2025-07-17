@@ -137,8 +137,7 @@ class Registry():
         registry = cls.load_registry()
         updated_registry = [i for i in registry if i['id'] != id]
         if len(updated_registry) == len(registry):
-            print(f"No item found with ID '{id}'.")
-            return False
+            raise ValueError(f"No item found with ID '{id}'.")
 
         cls.save_registry(updated_registry)
         return True
@@ -248,7 +247,9 @@ class Registry():
                 break
 
         if updated:
-            cls.save_registry(registry)
+            cls.save_registry(registry) 
+        else:
+            raise RuntimeError('Registry failed to update item by id.')       
         return updated
 
     @classmethod
@@ -266,14 +267,12 @@ class Registry():
         # Step 1: Get target item object (like a recipe or workout)
         target_obj = cls.get_item_object(target_item_name)
         if target_obj is None:
-            print(f"Could not find target item '{target_item_name}'.")
-            return False
+            raise ValueError(f"Could not find target item '{target_item_name}'.")
 
         # Step 2: Get component ID (by name or ID)
         component_id = cls.resolve_id(component_item_name)
         if component_id is None:
-            print(f"Could not find component item '{component_item_name}'.")
-            return False
+            raise ValueError(f"Could not find component item '{component_item_name}'.")
 
         # Step 3: Add to target’s makeup
         return target_obj.add_to_makeup(component_id)

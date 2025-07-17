@@ -25,7 +25,7 @@ class Item():
     
     # --- Initialization and ID Management ---
 
-    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str):
+    def __init__(self, item_name: str, item_type: str, sub_type: str, kcal: float, tags: List[str], brand: str, save: bool = False):
         """
         Initialize all attributes for an item. Autosaves the item to the registry upon initialization.
 
@@ -118,25 +118,27 @@ class Item():
         Returns:
             Item: An instance of Item with available basic fields set.
         """
-        item_name = data.get("name", "unknown")
-        item_type = data.get("item_type", "unknown")
-        sub_type = data.get("sub_type", "unknown")
-        tags = data.get("tags", [])
-        brand = data.get("brand", "unknown")
-        kcal = data.get("kcal", 0.0)
+        if CheckType.is_dict(data):
+            item_name = data.get("name", "unknown")
+            item_type = data.get("item_type", "unknown")
+            sub_type = data.get("sub_type", "unknown")
+            tags = data.get("tags", [])
+            brand = data.get("brand", "unknown")
+            kcal = data.get("kcal", 0.0)
 
-        # Create an instance with minimal data, ignoring extra fields.
-        # This won't include specialized attributes in child classes.
-        obj = cls(
-            item_name=item_name,
-            item_type=item_type,
-            sub_type=sub_type,
-            kcal=kcal,
-            tags=tags,
-            brand=brand, save = False
-        )
-        obj.id = data.get("id", obj.id)
-        return obj
+            # Create an instance with minimal data, ignoring extra fields.
+            # This won't include specialized attributes in child classes.
+            obj = cls(
+                item_name=item_name,
+                item_type=item_type,
+                sub_type=sub_type,
+                kcal=kcal,
+                tags=tags,
+                brand=brand, save = False
+            )
+            obj.id = data.get("id", obj.id)
+            return obj
+        raise TypeError ('Data is not valid')
     
     # --- Field Updates and Dependent Updates ---
     
@@ -151,6 +153,8 @@ class Item():
         Returns:
             bool: True if updated successfully, False if invalid field.
         """
+        
+        CheckType.is_string(field_name)
 
         if field_name not in vars(self):
             print(f"'{field_name}' is not a valid field name.")
@@ -174,8 +178,7 @@ class Item():
                 self.auto_update_dependents()
 
         # Now save updated object back to the registry
-        Registry.update_item_by_id(self.id, self.to_registry_dict())
-        return True
+        return Registry.update_item_by_id(self.id, self.to_registry_dict())
 
     def auto_update_dependents(self, change: str = None) -> bool:
         """
@@ -187,6 +190,8 @@ class Item():
 
         # changes the item's id in its depenents for future reference
         if change:
+            CheckType.is_string(change)
+
             dependents = Registry.get_items_using(self.id)
             registry = Registry.load_registry()
             updated = False
@@ -203,14 +208,12 @@ class Item():
                             break
             
             if updated:
-                Registry.save_registry(registry)
-                return True
+                return Registry.save_registry(registry)
             
             return False
         
         else:
-            Registry.update_dependents(self.id)
-            return True
+            return Registry.update_dependents(self.id)
 
     # --- Data Management ---
     
@@ -224,6 +227,9 @@ class Item():
         Returns:
             bool: True if added, False otherwise.
         """
+        
+        CheckType.is_string(tag)
+
         tag = tag.lower()
 
         if tag not in self.tags:
@@ -243,6 +249,9 @@ class Item():
         Returns:
             bool: True if removed, False otherwise.
         """
+        
+        CheckType.is_string(tag)
+
         tag = tag.lower()
 
         if tag in self.tags:
@@ -263,6 +272,8 @@ class Item():
             bool: True if tag exists, False otherwise.
         """
 
+        CheckType.is_string(tag)
+        
         return tag.lower() in self.tags
     
     def add_to_makeup(self, component_id: str) -> bool:
@@ -275,6 +286,9 @@ class Item():
         Returns:
             bool: True if added, False if already present.
         """
+        
+        CheckType.is_string(component_id)
+        
         if not hasattr(self, "makeup") or not isinstance(self.makeup, list):
             self.makeup = []
 

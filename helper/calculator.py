@@ -71,7 +71,7 @@ class NutritionalCalculator():
         if food:
             return CheckType.is_float((item.data["nutrition"]["macros"]["protein"] * 4 + item.data["nutrition"]["macros"]["fats"]["total_fat"] * 9 + item.data["nutrition"]["macros"]["carbs"] * 4))
         else:
-            if item.data["nutrition"]:
+            if item.data.get("nutrition"):
                 return CheckType.is_float((item.data["nutrition"]["protein"] * 4 + item.data["nutrition"]["fat"] * 9 + item.data["nutrition"]["carbs"] * 4))
             return 0.0
 

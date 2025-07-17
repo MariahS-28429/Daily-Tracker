@@ -31,7 +31,7 @@ class Supplement(Item):
                  active_ingredients: List[dict],
                  notes: str = "",
                  protein: float = 0.0, carbs: float = 0.0, total_fat: float = 0.0,
-                 kcal: float = 0.0, save = True):
+                 kcal: float = 0.0, save: bool = True):
         """
         Initialize a Supplement instance.
 
@@ -81,9 +81,9 @@ class Supplement(Item):
                 "fat": CheckType.is_float(total_fat)
             }
 
-        NutritionalCalculator.check_nutritional_data(self)
+        NutritionalCalculator.check_nutritional_data(self, food = False)
 
-        if save:
+        if CheckType.is_bool(save):
             # Register this item globally
             Registry.register_item(self.to_registry_dict())
 
@@ -183,7 +183,7 @@ class Supplement(Item):
                 ingredient_summary += ", ..."
 
         nutrition = self.data.get("nutrition", {})
-        kcal = nutrition.get("kcal")
+        kcal = self.kcal
         kcal_str = f"{kcal} kcal" if kcal is not None else "No kcal info"
 
         return f"{base} | {serving_info} | Active Ingredients: {ingredient_summary} | {kcal_str}"

@@ -52,7 +52,7 @@ class TestSupplement(unittest.TestCase):
         )
         self.assertIn("nutrition", supp.data)
         self.assertEqual(supp.data["nutrition"]["protein"], 24.0)
-        self.assertEqual(supp.data["nutrition"]["kcal"], 120)
+        self.assertEqual(supp.kcal, 120)
 
     def test_from_dict_minimal(self):
         data = {
@@ -87,6 +87,7 @@ class TestSupplement(unittest.TestCase):
             "sub_type": "gel",
             "tags": ["energy", "carb"],
             "brand": "RunFast",
+            "kcal": 100,
             "data": {
                 "serving_information": {
                     "serving_size": 30,
@@ -97,7 +98,6 @@ class TestSupplement(unittest.TestCase):
                     {"name": "Carbohydrate", "amount": 25, "unit": "g"}
                 ],
                 "nutrition": {
-                    "kcal": 100,
                     "protein": 0,
                     "carbs": 25,
                     "fat": 0

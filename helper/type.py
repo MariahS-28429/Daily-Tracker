@@ -45,3 +45,54 @@ class CheckType:
         else:
             caller = CheckType._get_caller_name()
             raise ValueError(f"'{value}' is not a valid list or string representing a list. (Called from: {caller})")
+        
+    @staticmethod
+    def is_dict(value: dict, allow_empty: bool = True) -> dict:
+        """
+        Ensures the value is a dictionary.
+        
+        Parameters:
+            value: The value to check.
+            allow_empty: Whether to allow an empty dictionary (default True).
+        
+        Returns:
+            The dictionary if valid.
+        
+        Raises:
+            ValueError if the value is not a dict or is empty when not allowed.
+        """
+        if isinstance(value, dict):
+            if not allow_empty and not value:
+                caller = CheckType._get_caller_name()
+                raise ValueError(f"Empty dictionary is not allowed. (Called from: {caller})")
+            return value
+        caller = CheckType._get_caller_name()
+        raise ValueError(f"'{value}' is not a valid dictionary. (Called from: {caller})")
+    
+    @staticmethod
+    def is_bool(value, allow_string: bool = True) -> bool:
+        """
+        Ensures the value is a boolean. Optionally allows string representations.
+        
+        Parameters:
+            value: The value to check or convert.
+            allow_string: If True, accepts 'true', 'false', 'yes', 'no', '1', '0' (case-insensitive).
+        
+        Returns:
+            A boolean value.
+        
+        Raises:
+            ValueError if the value is not a valid boolean or recognizable string.
+        """
+        if isinstance(value, bool):
+            return value
+
+        if allow_string and isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "yes", "1"}:
+                return True
+            elif lowered in {"false", "no", "0"}:
+                return False
+
+        caller = CheckType._get_caller_name()
+        raise ValueError(f"'{value}' is not a valid boolean. (Called from: {caller})")

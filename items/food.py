@@ -82,7 +82,7 @@ class Food(Item):
 
         NutritionalCalculator.check_nutritional_data(self)
 
-        if save:
+        if CheckType.is_bool(save):
             Registry.register_item(Item.to_registry_dict(self))
 
     # --- Editing ---
@@ -100,6 +100,10 @@ class Food(Item):
         Raises:
             ValueError: If the macro type is not recognized.
         """
+        
+        CheckType.is_string(macro_type)
+        CheckType.is_float(change)
+        
         macro_type = macro_type.lower()
         macro_paths = {
             "protein": ("nutrition", "macros", "protein"),
@@ -210,6 +214,8 @@ class Food(Item):
         Returns:
             Food: A new Food object reconstructed from the data.
         """
+
+        CheckType.is_dict(data)
 
         item_name = data["item_name"]
         sub_type = data["sub_type"]

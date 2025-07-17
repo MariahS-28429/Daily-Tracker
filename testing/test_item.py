@@ -165,7 +165,7 @@ class TestItem(unittest.TestCase):
         summary = item.summary()
         self.assertIn("Testitem", summary)
         self.assertIn("Genericbrand", summary)
-        self.assertIn("100 kcal", summary)
+        self.assertIn("100.0 kcal", summary)
         self.assertIn("tag1", summary)
 
     def test_add_to_makeup(self):
