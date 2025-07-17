@@ -1,5 +1,5 @@
 from items import Item
-from helper.type import CheckType
+from helper import CheckType, NutritionalCalculator
 from summary import Registry
 
 from typing import List
@@ -31,7 +31,7 @@ class Supplement(Item):
                  active_ingredients: List[dict],
                  notes: str = "",
                  protein: float = 0.0, carbs: float = 0.0, total_fat: float = 0.0,
-                 kcal: float = 0.0):
+                 kcal: float = 0.0, save = True):
         """
         Initialize a Supplement instance.
 
@@ -76,14 +76,16 @@ class Supplement(Item):
         # Include nutrition info only if any value > 0
         if kcal > 0 or protein > 0 or carbs > 0 or total_fat > 0:
             self.data["nutrition"] = {
-                "kcal": CheckType.is_float(kcal),
                 "protein": CheckType.is_float(protein),
                 "carbs": CheckType.is_float(carbs),
                 "fat": CheckType.is_float(total_fat)
             }
 
-        # Register this item globally
-        Registry.register_item(self.to_registry_dict())
+        NutritionalCalculator.check_nutritional_data(self)
+
+        if save:
+            # Register this item globally
+            Registry.register_item(self.to_registry_dict())
 
     @classmethod
     def from_dict(cls, data: dict) -> 'Supplement':
@@ -112,7 +114,6 @@ class Supplement(Item):
         # Extract nested nutrition if present
         nutrition = data.get("data", {}).get("nutrition", {})
         if nutrition:
-            kcal = nutrition.get("kcal", kcal)
             protein = nutrition.get("protein", 0.0)
             carbs = nutrition.get("carbs", 0.0)
             total_fat = nutrition.get("fat", 0.0)
@@ -130,7 +131,7 @@ class Supplement(Item):
         notes = data.get("data", {}).get("notes", "")
         
         # Build and return the Supplement instance
-        return cls(
+        obj = cls(
             item_name=item_name,
             sub_type=sub_type,
             tags=tags,
@@ -143,8 +144,10 @@ class Supplement(Item):
             protein=protein,
             carbs=carbs,
             total_fat=total_fat,
-            kcal=kcal
+            kcal=kcal, save = False
         )
+        obj.id = data.get("id", obj.id)
+        return obj
     
     # --- Representation & Summary ---
     

@@ -45,7 +45,7 @@ class Item():
         self.brand = CheckType.is_string(brand).lower()
         self.id = self.id_gen()
         self.tags = CheckType.is_list(tags)
-        self.kcal = kcal
+        self.kcal = CheckType.is_float(kcal)
         
         # Attributes are aren't brought in. Only used in some child classes
         self.time = 0.0
@@ -127,14 +127,16 @@ class Item():
 
         # Create an instance with minimal data, ignoring extra fields.
         # This won't include specialized attributes in child classes.
-        return cls(
+        obj = cls(
             item_name=item_name,
             item_type=item_type,
             sub_type=sub_type,
             kcal=kcal,
             tags=tags,
-            brand=brand
+            brand=brand, save = False
         )
+        obj.id = data.get("id", obj.id)
+        return obj
     
     # --- Field Updates and Dependent Updates ---
     
